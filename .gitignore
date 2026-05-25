@@ -1,0 +1,22 @@
+# Claude Code 本地設定
+.claude/
+
+# Python 虛擬環境
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 使用者資料（不上傳個人記錄）
+data/water_log.json
+data/water_log.json.tmp
+data/settings.json
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# Python 編譯快取
+*.egg-info/
+dist/
+build/
