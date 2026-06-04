@@ -16,6 +16,7 @@
 | ⏰ **下班前提醒** | 下班前 30 分鐘，若未達喝水目標自動提醒 |
 | 💊 **用藥提醒** | 每日 13:40 提醒服藥，服藥後顯示「已服 ✓」，跨重開機保留記錄 |
 | ⚙️ **彈性設定** | 下班時間、喝水目標、提醒間隔、用藥時間均可調整 |
+| 🚀 **開機自動啟動** | 登入後自動在背景啟動，無需手動開啟 |
 
 ---
 
@@ -52,12 +53,41 @@
 3. 時鐘視窗出現於螢幕右下角，可拖曳到任意位置
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/office-health-clock.git
+git clone https://github.com/vincentchiou/office-health-clock.git
 cd office-health-clock
 start.bat
 ```
 
 > **零額外套件**：純 Python 標準函式庫，無需 `pip install` 任何第三方套件。
+
+### 設定開機自動啟動
+
+1. 將 `startup.vbs` 放在專案資料夾（已包含）
+2. 建立本機啟動器 `C:\Users\<你的帳號>\HealthClock_launcher.vbs`，內容如下：
+
+```vbscript
+Dim WShell, vbsPath, fso
+WShell  = CreateObject("WScript.Shell")
+vbsPath = "C:\<你的專案路徑>\startup.vbs"   ' ← 改成你的實際路徑
+Set fso = CreateObject("Scripting.FileSystemObject")
+
+' 等待路徑就緒（最多 60 秒，適合 Google Drive 等雲端磁碟）
+Dim waited : waited = 0
+Do While Not fso.FileExists(vbsPath)
+    WScript.Sleep 2000 : waited = waited + 2
+    If waited >= 60 Then WScript.Quit
+Loop
+
+WShell.Run "wscript.exe """ & vbsPath & """", 0, False
+```
+
+3. 在 Windows **啟動資料夾** 建立捷徑指向此 VBS：
+   - 按 `Win + R` → 輸入 `shell:startup` → Enter
+   - 在開啟的資料夾中建立 `HealthClock_launcher.vbs` 的捷徑
+
+> **提示**：啟動器會等待雲端硬碟掛載完成再啟動，適合程式放在 Google Drive / OneDrive 的使用者。
+
+**取消自動啟動：** 刪除啟動資料夾中的捷徑即可。
 
 ---
 
@@ -82,6 +112,7 @@ start.bat
 ```
 office-health-clock/
 ├── start.bat              # 一鍵啟動
+├── startup.vbs            # 無聲啟動器（供開機自動啟動使用）
 ├── main.py                # 主程式入口
 ├── config.py              # 顏色、字體、常數
 ├── requirements.txt       # 無第三方套件
