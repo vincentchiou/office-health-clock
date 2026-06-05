@@ -62,30 +62,61 @@ start.bat
 
 ### 設定開機自動啟動
 
-1. 將 `startup.vbs` 放在專案資料夾（已包含）
-2. 建立本機啟動器 `C:\Users\<你的帳號>\HealthClock_launcher.vbs`，內容如下：
+專案內已附 `startup.vbs`，搭配本機啟動器可實現開機自動啟動，**適合程式放在 Google Drive / OneDrive 等雲端磁碟的使用者**（會等待磁碟掛載後才啟動）。
+
+#### Step 1 — 建立本機啟動器
+
+新增檔案 `C:\Users\<你的帳號>\HealthClock_launcher.vbs`，內容如下：
+
+> ⚠️ 此檔案必須以 **Unicode（UTF-16 LE）** 編碼儲存，否則中文路徑無法正確讀取。
+> 建議用 PowerShell 建立（見下方指令），或用記事本另存為「Unicode」格式。
 
 ```vbscript
-Dim WShell, vbsPath, fso
-WShell  = CreateObject("WScript.Shell")
-vbsPath = "C:\<你的專案路徑>\startup.vbs"   ' ← 改成你的實際路徑
+Dim WShell, fso, vbsPath, waited
+Set WShell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
+vbsPath = "C:\<你的專案完整路徑>\startup.vbs"   ' ← 改成你的實際路徑
 
-' 等待路徑就緒（最多 60 秒，適合 Google Drive 等雲端磁碟）
-Dim waited : waited = 0
+waited = 0
 Do While Not fso.FileExists(vbsPath)
-    WScript.Sleep 2000 : waited = waited + 2
+    WScript.Sleep 2000
+    waited = waited + 2
     If waited >= 60 Then WScript.Quit
 Loop
 
-WShell.Run "wscript.exe """ & vbsPath & """", 0, False
+WShell.Run "wscript.exe " & Chr(34) & vbsPath & Chr(34), 0, False
 ```
 
-3. 在 Windows **啟動資料夾** 建立捷徑指向此 VBS：
-   - 按 `Win + R` → 輸入 `shell:startup` → Enter
-   - 在開啟的資料夾中建立 `HealthClock_launcher.vbs` 的捷徑
+**用 PowerShell 自動建立（推薦）：**
 
-> **提示**：啟動器會等待雲端硬碟掛載完成再啟動，適合程式放在 Google Drive / OneDrive 的使用者。
+```powershell
+# 在 PowerShell 中執行，將路徑改為你的實際路徑
+$content = @"
+Dim WShell, fso, vbsPath, waited
+Set WShell = CreateObject("WScript.Shell")
+Set fso = CreateObject("Scripting.FileSystemObject")
+vbsPath = "C:\你的專案路徑\startup.vbs"
+
+waited = 0
+Do While Not fso.FileExists(vbsPath)
+    WScript.Sleep 2000
+    waited = waited + 2
+    If waited >= 60 Then WScript.Quit
+Loop
+
+WShell.Run "wscript.exe " & Chr(34) & vbsPath & Chr(34), 0, False
+"@
+[System.IO.File]::WriteAllText(
+    "$env:USERPROFILE\HealthClock_launcher.vbs",
+    $content,
+    [System.Text.Encoding]::Unicode
+)
+```
+
+#### Step 2 — 加入 Windows 啟動資料夾
+
+1. 按 `Win + R` → 輸入 `shell:startup` → Enter
+2. 在開啟的資料夾中，為 `HealthClock_launcher.vbs` 建立捷徑
 
 **取消自動啟動：** 刪除啟動資料夾中的捷徑即可。
 
