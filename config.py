@@ -104,6 +104,18 @@ SHADOW_DARK      = "#080c12"   # 深陰影
 CIRCLE_SIZE      = 80         # 圓形指示器大小
 GAUGE_SIZE       = 100        # 儀表盤大小
 INDICATOR_SIZE   = 60         # 小型指示器大小
+ICON_FONT_SIZE   = 32         # 動畫圖標字體大小
+
+# AnimatedIcon 動畫參數
+SPARKLE_INTERVAL       = 6    # 粒子發射間隔（幀數）
+BORDER_WIDTH_BASE      = 3    # 圓形邊框基礎寬度
+BORDER_WIDTH_AMPLITUDE = 2    # 圓形邊框脈衝振幅
+CIRCLE_INSET           = 8    # 圓形內縮像素
+PULSE_AMPLITUDE        = 0.1  # 脈衝縮放振幅
+
+# ReminderWindow 參數
+OVERLAY_ALPHA          = 0.65 # 遮罩層透明度
+DIALOG_START_SCALE     = 0.1  # 入場動畫起始縮放
 
 # 預設設定（若 settings.json 不存在時使用）
 DEFAULT_SETTINGS = {

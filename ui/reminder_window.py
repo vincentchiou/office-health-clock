@@ -3,8 +3,9 @@
 import tkinter as tk
 import math
 import winsound
+from collections.abc import Callable
 import config
-from ui.effects import GlowEffect, PulseEffect
+from ui.effects import GlowEffect
 from ui.particles import ParticleSystem
 from ui.animations import EasingFunctions
 
@@ -29,11 +30,10 @@ class AnimatedIcon:
         self.frame: int = 0
         self.pulse_phase: float = 0.0
         self.glow_phase: float = 0.0
-        self.animation_id = None
-        self._glow = GlowEffect(self.canvas)
-        self._pulse = PulseEffect(self.canvas)
-        self._particles = ParticleSystem(self.canvas)
-        self._sparkle_interval = 0
+        self.animation_id: int | None = None
+        self._glow: GlowEffect = GlowEffect(self.canvas)
+        self._particles: ParticleSystem = ParticleSystem(self.canvas)
+        self._sparkle_interval: int = 0
 
     def pack(self, **kwargs):
         self.canvas.pack(**kwargs)
@@ -51,7 +51,7 @@ class AnimatedIcon:
         self.draw()
 
         self._sparkle_interval += 1
-        if self._sparkle_interval % 6 == 0:
+        if self._sparkle_interval % config.SPARKLE_INTERVAL == 0:
             cx, cy = self.size // 2, self.size // 2
             self._particles.emit_sparkles(cx, cy, count=2)
 
@@ -60,11 +60,9 @@ class AnimatedIcon:
     def draw(self):
         """繪製動畫圖標"""
         self.canvas.delete("all")
-        self._glow.clear_glow()
-        self._pulse.stop_pulse()
 
         cx, cy = self.size // 2, self.size // 2
-        pulse_scale = 1.0 + 0.1 * math.sin(self.pulse_phase)
+        pulse_scale = 1.0 + config.PULSE_AMPLITUDE * math.sin(self.pulse_phase)
 
         # 使用 GlowEffect 繪製脈衝光暈
         glow_radius = config.GLOW_RADIUS + int(5 * pulse_scale)
@@ -72,24 +70,25 @@ class AnimatedIcon:
                              intensity=config.GLOW_INTENSITY * pulse_scale)
 
         # 主圓形與動態邊框
-        border_width = 3 + int(2 * math.sin(self.glow_phase))
+        border_width = config.BORDER_WIDTH_BASE + int(config.BORDER_WIDTH_AMPLITUDE * math.sin(self.glow_phase))
+        inset = config.CIRCLE_INSET
         self.canvas.create_oval(
-            cx - config.CIRCLE_SIZE // 2 + 8, cy - config.CIRCLE_SIZE // 2 + 8,
-            cx + config.CIRCLE_SIZE // 2 - 8, cy + config.CIRCLE_SIZE // 2 - 8,
+            cx - config.CIRCLE_SIZE // 2 + inset, cy - config.CIRCLE_SIZE // 2 + inset,
+            cx + config.CIRCLE_SIZE // 2 - inset, cy + config.CIRCLE_SIZE // 2 - inset,
             fill=config.BG_ELEVATED, outline=self.color, width=border_width)
 
         # 圖標文字與陰影效果
+        icon_font = ("Segoe UI", config.ICON_FONT_SIZE)
         self.canvas.create_text(cx + 1, cy + 1, text=self.icon,
-                                font=("Segoe UI", 32), fill=config.SHADOW_DARK)
+                                font=icon_font, fill=config.SHADOW_DARK)
         self.canvas.create_text(cx, cy, text=self.icon,
-                                font=("Segoe UI", 32), fill=self.color)
+                                font=icon_font, fill=self.color)
 
     def stop_animation(self):
         """停止動畫"""
         if self.animation_id:
             self.canvas.after_cancel(self.animation_id)
             self.animation_id = None
-        self._pulse.stop_pulse()
         self._particles.clear()
 
 
@@ -252,7 +251,7 @@ class ReminderWindow:
 
     def _animate_dialog_entrance(self, dialog: tk.Toplevel):
         """以縮放與淡入動畫呈現對話框"""
-        dialog.scale = 0.1
+        dialog.scale = config.DIALOG_START_SCALE
         dialog.alpha = 0.0
         step = 0
         total_steps = self._ANIM_STEP_COUNT
@@ -263,7 +262,7 @@ class ReminderWindow:
             t = step / total_steps
             eased = EasingFunctions.ease_out_cubic(t)
 
-            dialog.scale = 0.1 + 0.9 * eased
+            dialog.scale = config.DIALOG_START_SCALE + (1.0 - config.DIALOG_START_SCALE) * eased
             dialog.alpha = min(1.0, eased)
 
             if step >= total_steps:
@@ -304,9 +303,11 @@ class ReminderWindow:
 
         animate_step()
 
-    def _show(self, title: str, icon: str, lines: list, buttons: list,
-              skip_text: str = None, on_close=None, accent_color: str = None,
-              icon_color: str = None, progress: float = 0, progress_text: str = ""):
+    def _show(self, title: str, icon: str, lines: list[str],
+              buttons: list[tuple[str, Callable | None]],
+              skip_text: str | None = None, on_close: Callable | None = None,
+              accent_color: str | None = None, icon_color: str | None = None,
+              progress: float = 0, progress_text: str = ""):
         if accent_color is None:
             accent_color = config.BTN_PRIMARY
         if icon_color is None:
@@ -320,7 +321,7 @@ class ReminderWindow:
         overlay.geometry(f"{sw}x{sh}+0+0")
         overlay.overrideredirect(True)
         overlay.attributes("-topmost", True)
-        overlay.attributes("-alpha", 0.65)
+        overlay.attributes("-alpha", config.OVERLAY_ALPHA)
         overlay.configure(bg=config.OVERLAY_COLOR)
         overlay.update()
 
