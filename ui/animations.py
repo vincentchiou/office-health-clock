@@ -32,8 +32,8 @@ class EasingFunctions:
 
     @staticmethod
     def ease_out_cubic(t: float) -> float:
-        t -= 1
-        return t * t * t + 1
+        t_adj = t - 1
+        return t_adj * t_adj * t_adj + 1
 
     @staticmethod
     def ease_in_out_cubic(t: float) -> float:
@@ -67,7 +67,9 @@ class Animation:
 
     def __init__(self, duration: float = 1.0, easing: str = "linear"):
         self.duration = duration
-        self.easing = getattr(EasingFunctions, easing, EasingFunctions.linear)
+        if not hasattr(EasingFunctions, easing):
+            raise ValueError(f"Unknown easing function: '{easing}'. Available: {[m for m in dir(EasingFunctions) if not m.startswith('_')]}")
+        self.easing = getattr(EasingFunctions, easing)
         self.start_time = None
         self.is_playing = False
         self.is_reverse = False
@@ -89,21 +91,20 @@ class Animation:
             return False, 0.0
 
         elapsed = time.time() - self.start_time
-        progress = min(1.0, elapsed / self.duration)
+        raw_progress = min(1.0, elapsed / self.duration)
 
-        if self.is_reverse:
-            progress = 1.0 - progress
-
-        if progress >= 1.0:
+        if raw_progress >= 1.0:
             if self.loop:
                 self.start_time = time.time()
-                return True, 0.0
+                # Reverse loops restart from 1.0; normal loops restart from 0.0
+                return True, self.easing(1.0 if self.is_reverse else 0.0)
             else:
                 self.is_playing = False
                 if self.on_complete:
                     self.on_complete()
-                return False, 1.0
+                return False, self.easing(0.0 if self.is_reverse else 1.0)
 
+        progress = 1.0 - raw_progress if self.is_reverse else raw_progress
         return True, self.easing(progress)
 
 
@@ -125,6 +126,7 @@ class AnimationManager:
 
     def update(self):
         """Update all animations"""
+        # Copy to safe-iterate: animations may be removed during update via del
         for name, anim in list(self.animations.items()):
             if anim.is_playing:
                 is_active, progress = anim.update()
@@ -203,7 +205,7 @@ class KeyframeAnimation:
         prev_props = prev_kf[1]
         next_props = next_kf[1]
 
-        for key in set(list(prev_props.keys()) + list(next_props.keys())):
+        for key in set(prev_props) | set(next_props):
             if key in prev_props and key in next_props:
                 if isinstance(prev_props[key], (int, float)):
                     result[key] = prev_props[key] + (next_props[key] - prev_props[key]) * t
