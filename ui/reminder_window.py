@@ -4,6 +4,9 @@ import tkinter as tk
 import math
 import winsound
 import config
+from ui.effects import GlowEffect, PulseEffect
+from ui.particles import ParticleSystem
+from ui.animations import EasingFunctions
 
 
 def _play_alert():
@@ -14,101 +17,115 @@ def _play_alert():
 
 
 class AnimatedIcon:
-    """Enhanced animated icon with particle effects"""
-    
-    def __init__(self, parent, icon, size=80, color=config.BTN_PRIMARY):
+    """增強的動畫圖標，帶有粒子效果"""
+
+    def __init__(self, parent: tk.Widget, icon: str, size: int = 80,
+                 color: str = config.BTN_PRIMARY):
         self.icon = icon
         self.size = size
         self.color = color
         self.canvas = tk.Canvas(parent, width=size, height=size,
-                               bg=config.BG_COLOR, highlightthickness=0, bd=0)
-        self.frame = 0
-        self.pulse_phase = 0
-        self.glow_phase = 0
+                                bg=config.BG_COLOR, highlightthickness=0, bd=0)
+        self.frame: int = 0
+        self.pulse_phase: float = 0.0
+        self.glow_phase: float = 0.0
         self.animation_id = None
-        
+        self._glow = GlowEffect(self.canvas)
+        self._pulse = PulseEffect(self.canvas)
+        self._particles = ParticleSystem(self.canvas)
+        self._sparkle_interval = 0
+
     def pack(self, **kwargs):
         self.canvas.pack(**kwargs)
-        
+
     def start_animation(self):
-        """Start continuous animation"""
-        self.animation_id = self.canvas.after(50, self._animate)
-        
+        """開始持續動畫"""
+        self.animation_id = self.canvas.after(config.ANIM_FAST, self._animate)
+
     def _animate(self):
-        """Animate the icon"""
+        """執行動畫幀"""
         self.frame += 1
-        self.pulse_phase += 0.1
-        self.glow_phase += 0.05
-        
+        self.pulse_phase += config.ANIM_DURATION_NORMAL
+        self.glow_phase += config.ANIM_DURATION_FAST
+
         self.draw()
-        self.animation_id = self.canvas.after(50, self._animate)
-        
+
+        self._sparkle_interval += 1
+        if self._sparkle_interval % 6 == 0:
+            cx, cy = self.size // 2, self.size // 2
+            self._particles.emit_sparkles(cx, cy, count=2)
+
+        self.animation_id = self.canvas.after(config.ANIM_FAST, self._animate)
+
     def draw(self):
-        """Draw the animated icon"""
+        """繪製動畫圖標"""
         self.canvas.delete("all")
+        self._glow.clear_glow()
+        self._pulse.stop_pulse()
+
         cx, cy = self.size // 2, self.size // 2
-        
-        # Pulsing glow effect
         pulse_scale = 1.0 + 0.1 * math.sin(self.pulse_phase)
-        
-        # Draw multiple glow layers
-        for i in range(4):
-            r = 35 + i * 3 * pulse_scale
-            alpha = 0.4 * (1 - i / 4)
-            self.canvas.create_oval(cx - r, cy - r, 
-                                   cx + r, cy + r,
-                                   fill="", outline=self.color, width=1)
-        
-        # Main circle with dynamic border
+
+        # 使用 GlowEffect 繪製脈衝光暈
+        glow_radius = config.GLOW_RADIUS + int(5 * pulse_scale)
+        self._glow.draw_glow(cx, cy, glow_radius, self.color,
+                             intensity=config.GLOW_INTENSITY * pulse_scale)
+
+        # 主圓形與動態邊框
         border_width = 3 + int(2 * math.sin(self.glow_phase))
-        self.canvas.create_oval(cx - 32, cy - 32, cx + 32, cy + 32,
-                               fill=config.BG_ELEVATED, outline=self.color, width=border_width)
-        
-        # Icon text with shadow effect
+        self.canvas.create_oval(
+            cx - config.CIRCLE_SIZE // 2 + 8, cy - config.CIRCLE_SIZE // 2 + 8,
+            cx + config.CIRCLE_SIZE // 2 - 8, cy + config.CIRCLE_SIZE // 2 - 8,
+            fill=config.BG_ELEVATED, outline=self.color, width=border_width)
+
+        # 圖標文字與陰影效果
         self.canvas.create_text(cx + 1, cy + 1, text=self.icon,
-                               font=("Segoe UI", 32), fill=config.SHADOW_DARK)
+                                font=("Segoe UI", 32), fill=config.SHADOW_DARK)
         self.canvas.create_text(cx, cy, text=self.icon,
-                               font=("Segoe UI", 32), fill=self.color)
-        
+                                font=("Segoe UI", 32), fill=self.color)
+
     def stop_animation(self):
-        """Stop animation"""
+        """停止動畫"""
         if self.animation_id:
             self.canvas.after_cancel(self.animation_id)
             self.animation_id = None
+        self._pulse.stop_pulse()
+        self._particles.clear()
 
 
 class ProgressBar:
     """進度條"""
-    
-    def __init__(self, parent, width=250, height=20, color=config.COLOR_WATER):
+
+    def __init__(self, parent: tk.Widget, width: int = 250, height: int = 20,
+                 color: str = config.COLOR_WATER):
         self.width = width
         self.height = height
         self.color = color
         self.canvas = tk.Canvas(parent, width=width, height=height,
-                               bg=config.BG_COLOR, highlightthickness=0, bd=0)
-        
+                                bg=config.BG_COLOR, highlightthickness=0, bd=0)
+
     def pack(self, **kwargs):
         self.canvas.pack(**kwargs)
-        
-    def update(self, progress, text=""):
+
+    def update(self, progress: float, text: str = ""):
         """更新進度條 0-1"""
         self.canvas.delete("all")
-        
+
         # 背景
         self.canvas.create_rectangle(0, 0, self.width, self.height,
-                                    fill=config.SYS_BAR_BG, outline="", width=0)
-        
+                                     fill=config.SYS_BAR_BG, outline="", width=0)
+
         # 進度（圓角效果）
         if progress > 0:
             bar_width = int(self.width * progress)
             self.canvas.create_rectangle(2, 2, bar_width - 2, self.height - 2,
-                                        fill=self.color, outline="", width=0)
-        
+                                         fill=self.color, outline="", width=0)
+
         # 文字
         if text:
             self.canvas.create_text(self.width // 2, self.height // 2,
-                                   text=text, font=config.FONT_SMALL,
-                                   fill=config.TEXT_PRIMARY)
+                                    text=text, font=config.FONT_SMALL,
+                                    fill=config.TEXT_PRIMARY)
 
 
 class ReminderWindow:
@@ -119,6 +136,10 @@ class ReminderWindow:
     - 視覺化進度條
     - 增強的按鈕效果
     """
+
+    _DIALOG_WIDTH = 440
+    _DIALOG_HEIGHT = 380
+    _ANIM_STEP_COUNT = 20
 
     def __init__(self, root: tk.Tk):
         self._root = root
@@ -136,7 +157,7 @@ class ReminderWindow:
             buttons=[("✓  已完成，繼續工作", None)],
             on_close=on_close,
             accent_color=config.COLOR_TIMER,
-            progress=elapsed_minutes / 50,  # 假設50分鐘為目標
+            progress=elapsed_minutes / 50,
             progress_text=f"{elapsed_minutes}/50 分鐘",
         )
 
@@ -220,63 +241,72 @@ class ReminderWindow:
             progress_text=f"{int(pct*100)}%",
         )
 
-    def _animate_dialog_entrance(self, dialog):
-        """Animate dialog entrance with scale and fade"""
-        # Start small and scale up
+    def _apply_dialog_geometry(self, dialog: tk.Toplevel, scale: float, alpha: float):
+        """根據 scale 與 alpha 套用對話框幾何與透明度"""
+        width = int(self._DIALOG_WIDTH * scale)
+        height = int(self._DIALOG_HEIGHT * scale)
+        x = (dialog.winfo_screenwidth() - width) // 2
+        y = (dialog.winfo_screenheight() - height) // 2
+        dialog.geometry(f"{width}x{height}+{x}+{y}")
+        dialog.attributes("-alpha", alpha)
+
+    def _animate_dialog_entrance(self, dialog: tk.Toplevel):
+        """以縮放與淡入動畫呈現對話框"""
         dialog.scale = 0.1
         dialog.alpha = 0.0
-        
+        step = 0
+        total_steps = self._ANIM_STEP_COUNT
+
         def animate_step():
-            dialog.scale += 0.05
-            dialog.alpha += 0.05
-            
-            if dialog.scale >= 1.0:
+            nonlocal step
+            step += 1
+            t = step / total_steps
+            eased = EasingFunctions.ease_out_cubic(t)
+
+            dialog.scale = 0.1 + 0.9 * eased
+            dialog.alpha = min(1.0, eased)
+
+            if step >= total_steps:
                 dialog.scale = 1.0
                 dialog.alpha = 1.0
+                self._apply_dialog_geometry(dialog, 1.0, 1.0)
                 return
-                
-            # Apply scale effect (simulated with geometry)
-            width = int(440 * dialog.scale)
-            height = int(380 * dialog.scale)
-            x = (dialog.winfo_screenwidth() - width) // 2
-            y = (dialog.winfo_screenheight() - height) // 2
-            
-            dialog.geometry(f"{width}x{height}+{x}+{y}")
-            dialog.attributes("-alpha", dialog.alpha)
-            
-            dialog.after(16, animate_step)
-            
+
+            self._apply_dialog_geometry(dialog, dialog.scale, dialog.alpha)
+            dialog.after(config.ANIM_FAST, animate_step)
+
         animate_step()
 
-    def _animate_dialog_exit(self, dialog, overlay, callback=None):
-        """Animate dialog exit"""
+    def _animate_dialog_exit(self, dialog: tk.Toplevel, overlay: tk.Toplevel,
+                             callback=None):
+        """以縮放與淡出動畫關閉對話框"""
+        step = 0
+        total_steps = self._ANIM_STEP_COUNT
+
         def animate_step():
-            dialog.scale -= 0.1
-            dialog.alpha -= 0.1
-            
-            if dialog.scale <= 0.0:
+            nonlocal step
+            step += 1
+            t = step / total_steps
+            eased = EasingFunctions.ease_in_cubic(t)
+
+            scale = max(0.0, 1.0 - eased)
+            alpha = max(0.0, 1.0 - eased)
+
+            if step >= total_steps:
                 dialog.destroy()
                 overlay.destroy()
                 if callback:
                     callback()
                 return
-                
-            # Apply exit effect
-            width = int(440 * dialog.scale)
-            height = int(380 * dialog.scale)
-            x = (dialog.winfo_screenwidth() - width) // 2
-            y = (dialog.winfo_screenheight() - height) // 2
-            
-            dialog.geometry(f"{width}x{height}+{x}+{y}")
-            dialog.attributes("-alpha", dialog.alpha)
-            
-            dialog.after(16, animate_step)
-            
+
+            self._apply_dialog_geometry(dialog, scale, alpha)
+            dialog.after(config.ANIM_FAST, animate_step)
+
         animate_step()
 
-    def _show(self, title, icon, lines, buttons,
-              skip_text=None, on_close=None, accent_color=None,
-              icon_color=None, progress=0, progress_text=""):
+    def _show(self, title: str, icon: str, lines: list, buttons: list,
+              skip_text: str = None, on_close=None, accent_color: str = None,
+              icon_color: str = None, progress: float = 0, progress_text: str = ""):
         if accent_color is None:
             accent_color = config.BTN_PRIMARY
         if icon_color is None:
@@ -295,7 +325,7 @@ class ReminderWindow:
         overlay.update()
 
         # ── 對話框 ──────────────────────────────────────
-        dw, dh = 440, 380
+        dw, dh = self._DIALOG_WIDTH, self._DIALOG_HEIGHT
         dx = (sw - dw) // 2
         dy = (sh - dh) // 2
 
@@ -315,7 +345,8 @@ class ReminderWindow:
         inner.pack(fill="both", expand=True)
 
         # 動畫圖標
-        icon_widget = AnimatedIcon(inner, icon, size=80, color=icon_color)
+        icon_widget = AnimatedIcon(inner, icon, size=config.CIRCLE_SIZE,
+                                   color=icon_color)
         icon_widget.pack(pady=(0, 12))
         icon_widget.draw()
         icon_widget.start_animation()
@@ -337,11 +368,13 @@ class ReminderWindow:
 
         # 進度條
         if progress_text:
-            progress_bar = ProgressBar(inner, width=280, height=24, color=accent_color)
+            progress_bar = ProgressBar(inner, width=280, height=24,
+                                       color=accent_color)
             progress_bar.pack(pady=(12, 8))
             progress_bar.update(progress, progress_text)
 
-        tk.Frame(inner, bg=config.DIVIDER_COLOR, height=1).pack(fill="x", pady=(8, 12))
+        tk.Frame(inner, bg=config.DIVIDER_COLOR, height=1).pack(
+            fill="x", pady=(8, 12))
 
         # 按鈕區域
         btn_frame = tk.Frame(inner, bg=config.BG_COLOR)
@@ -356,21 +389,22 @@ class ReminderWindow:
             guard_id[0] and dlg.after_cancel(guard_id[0])
             icon_widget.stop_animation()
             dlg.grab_release()
-            
+
             def on_animation_done():
                 if extra_cb:
                     extra_cb()
                 if on_close:
                     on_close()
-            
+
             self._animate_dialog_exit(dlg, overlay, on_animation_done)
 
         # 建立按鈕
         for i, (label, cb) in enumerate(buttons):
+            btn_color = accent_color
             btn = tk.Button(
                 btn_frame, text=label,
                 font=config.FONT_BTN_LARGE,
-                bg=accent_color, fg="white",
+                bg=btn_color, fg="white",
                 activebackground=config.BTN_PRIMARY_HOVER,
                 activeforeground="white",
                 relief="flat", padx=18, pady=10, cursor="hand2",
@@ -378,13 +412,13 @@ class ReminderWindow:
             )
             btn.pack(side="left", padx=8, pady=4)
 
-            def on_enter(e, b=btn, color=accent_color):
-                b.config(bg=config.BTN_PRIMARY_HOVER)
-            def on_leave(e, b=btn, color=accent_color):
+            def on_enter(e, b=btn, color=btn_color):
+                b.config(bg=color)
+            def on_leave(e, b=btn, color=btn_color):
                 b.config(bg=color)
             def on_press(e, b=btn):
                 b.config(bg=config.BTN_PRIMARY_ACTIVE)
-            def on_release(e, b=btn, color=accent_color):
+            def on_release(e, b=btn, color=btn_color):
                 b.config(bg=color)
 
             btn.bind("<Enter>", on_enter)
@@ -422,8 +456,8 @@ class ReminderWindow:
         dlg.focus_force()
         dlg.bind("<Escape>", lambda e: _close())
         dlg.bind("<Return>", lambda e: _close())
-        
-        # Start entrance animation
+
+        # 開始入場動畫
         self._animate_dialog_entrance(dlg)
 
         guard_id = [None]
