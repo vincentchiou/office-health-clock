@@ -233,7 +233,11 @@ class ClockWindow:
         self._drag_x = 0
         self._drag_y = 0
 
+        self._particle_system = None
+        self._water_goal_celebrated = False
+
         self._build()
+        self._setup_particles()
         self._place_window()
 
     # ── 公開 API ──────────────────────────────────────────
@@ -314,7 +318,7 @@ class ClockWindow:
                              fg=config.CLOSE_COLOR, bg=config.BG_SECONDARY,
                              cursor="hand2", padx=8, pady=2)
         close_btn.pack(side="left", padx=(8, 0))
-        close_btn.bind("<Button-1>", lambda e: self._on_close())
+        close_btn.bind("<Button-1>", lambda e: (self.destroy(), self._on_close()))
         close_btn.bind("<Enter>", lambda e: close_btn.config(fg=config.CLOSE_HOVER, bg=config.BG_TERTIARY))
         close_btn.bind("<Leave>", lambda e: close_btn.config(fg=config.CLOSE_COLOR, bg=config.BG_SECONDARY))
 
@@ -500,11 +504,18 @@ class ClockWindow:
         done = total >= target
         color = config.COLOR_WATER_DONE if done else config.COLOR_WATER
         pct = min(1.0, total / target) if target else 0
-        
+
         self._lbl_water.config(fg=color)
-        
+
         # 更新喝水指示器
         self._water_indicator.update(pct, f"{int(pct*100)}%", color)
+
+        # 達標慶祝（僅觸發一次）
+        if done and not self._water_goal_celebrated:
+            self._water_goal_celebrated = True
+            self._celebrate_water_goal()
+        elif not done:
+            self._water_goal_celebrated = False
 
     def _update_med_display(self):
         if self._med_taken:
@@ -557,6 +568,42 @@ class ClockWindow:
         elif temp >= 65:
             return config.SYS_TEMP_WARM
         return config.SYS_TEMP_OK
+
+    # ── 粒子效果 ──────────────────────────────────────────
+
+    def _setup_particles(self) -> None:
+        """Setup particle system for visual effects"""
+        try:
+            from ui.particles import ParticleSystem
+            self._particle_canvas = tk.Canvas(self._main, bg=config.BG_COLOR,
+                                             highlightthickness=0, bd=0)
+            self._particle_canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
+            self._particle_system = ParticleSystem(self._particle_canvas)
+        except ImportError:
+            self._particle_system = None
+
+    def _celebrate_water_goal(self) -> None:
+        """Emit confetti once when water goal is reached.
+
+        This is a one-shot effect: ``_water_goal_celebrated`` is set to
+        ``True`` by ``_update_water_display`` before calling this method,
+        so subsequent ticks will not re-trigger the celebration unless the
+        user drops below the target and reaches it again.
+        """
+        if self._particle_system:
+            x = config.WINDOW_WIDTH // 2
+            y = config.WINDOW_HEIGHT // 2
+            self._particle_system.emit_confetti(x, y, config.PARTICLE_CONFETTI_COUNT)
+
+    def destroy(self) -> None:
+        """Clean up particle system callbacks before the root window is destroyed.
+
+        Must be called *before* ``root.destroy()`` to prevent ``TclError``
+        from pending ``after`` callbacks firing on a dead widget.
+        """
+        if self._particle_system is not None:
+            self._particle_system.clear()
+            self._particle_system = None
 
     # ── 拖曳 ──────────────────────────────────────────────
 
