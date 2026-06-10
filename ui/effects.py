@@ -18,11 +18,9 @@ class GlowEffect:
         # Multiple concentric circles with decreasing opacity
         for i in range(3):
             r = radius + i * 2
-            alpha = intensity * (1 - i / 3)
             self.canvas.create_oval(
                 x - r, y - r, x + r, y + r,
                 fill=color, outline="",
-                stipple="@" if alpha < 1.0 else "",
                 tags="glow"
             )
             
@@ -47,7 +45,6 @@ class ShadowEffect:
             self.canvas.create_rectangle(
                 x + ox, y + oy, x + width + ox, y + height + oy,
                 fill=color, outline="",
-                stipple="@" if i < 2 else "",
                 tags="shadow"
             )
             

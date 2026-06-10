@@ -9,190 +9,285 @@ WEEKDAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"
 
 
 class CircleIndicator:
-    """Enhanced circular progress indicator with animations"""
+    """Enhanced circular progress indicator with glowing arcs"""
     
     def __init__(self, parent, size=80, color=config.COLOR_WATER, bg_color=config.SYS_BAR_BG):
         self.size = size
         self.color = color
         self.bg_color = bg_color
         self.canvas = tk.Canvas(parent, width=size, height=size, 
-                               bg=config.BG_COLOR, highlightthickness=0, bd=0)
+                               bg=config.SYS_BAR_BG, highlightthickness=0, bd=0)
         self.progress = 0
         self.target_progress = 0
         self.animation_id = None
-        self.pulse_effect = None
         
     def pack(self, **kwargs):
         self.canvas.pack(**kwargs)
         
     def update(self, progress, text="", sub_text=""):
-        """Update with smooth animation"""
         self.target_progress = min(1.0, max(0.0, progress))
-        
-        # Start animation if not already running
         if self.animation_id is None:
             self._animate_progress()
             
     def _animate_progress(self):
-        """Animate progress change"""
         diff = self.target_progress - self.progress
-        
-        if abs(diff) < 0.01:
+        if abs(diff) < 0.005:
             self.progress = self.target_progress
             self._draw()
+            self.animation_id = None
             return
-            
-        # Smooth interpolation
-        self.progress += diff * 0.1
+        self.progress += diff * 0.12
         self._draw()
         self.animation_id = self.canvas.after(16, self._animate_progress)
         
     def _draw(self):
-        """Draw the indicator"""
         self.canvas.delete("all")
-        
         cx, cy = self.size // 2, self.size // 2
-        radius = self.size // 2 - 8
-        
-        # Draw background arc
-        self._draw_arc(cx, cy, radius, 1.0, self.bg_color, width=8)
-        
-        # Draw progress arc with glow effect
+        radius = self.size // 2 - 12
+        main_w = config.ARC_WIDTH_MAIN
+        glow_w = config.ARC_WIDTH_GLOW
+
+        # Background circle (track)
+        self._draw_arc(cx, cy, radius, 1.0, self.bg_color, width=main_w)
+
         if self.progress > 0:
-            # Draw glow
-            for i in range(3):
-                r = radius + i * 2
-                alpha = 0.3 * (1 - i / 3)
-                self._draw_arc(cx, cy, r, self.progress, self.color, width=2)
-                
-            # Draw main arc
-            self._draw_arc(cx, cy, radius, self.progress, self.color, width=8)
-        
-        # Draw center text
+            # Glow layers (larger radius, lower opacity via stipple)
+            for i in range(config.ARC_GLOW_LAYERS, 0, -1):
+                r = radius + i * 3
+                w = max(1, glow_w - i)
+                self._draw_arc(cx, cy, r, self.progress, self.color, width=w)
+
+            # Inner glow
+            if config.INDICATOR_INNER_GLOW:
+                self._draw_arc(cx, cy, radius - 2, self.progress,
+                               self._brighten(self.color, 0.4), width=3)
+
+            # Main progress arc
+            self._draw_arc(cx, cy, radius, self.progress, self.color, width=main_w)
+
+            # Bright tip at end of arc
+            self._draw_tip(cx, cy, radius, self.progress, self.color)
+
+        # Center text
         text = f"{int(self.progress * 100)}%"
-        self.canvas.create_text(cx, cy - 5, text=text, 
+        self.canvas.create_text(cx, cy, text=text,
                                font=config.FONT_CIRCLE, fill=config.TEXT_PRIMARY)
         
     def _draw_arc(self, cx, cy, radius, progress, color, width=8):
-        """Draw an arc"""
-        start_angle = 90  # Start from top
+        start_angle = 90
         extent = 360 * progress
-        
-        # Use multiple line segments to simulate arc
         points = []
-        steps = max(2, int(36 * progress))
+        steps = max(3, int(40 * progress))
         for i in range(steps + 1):
             angle = math.radians(start_angle - (extent * i / steps))
             x = cx + radius * math.cos(angle)
             y = cy - radius * math.sin(angle)
             points.append((x, y))
-        
-        # Draw line segments
         for i in range(len(points) - 1):
-            self.canvas.create_line(points[i], points[i+1], 
+            self.canvas.create_line(points[i], points[i+1],
                                    fill=color, width=width, capstyle=tk.ROUND)
+
+    def _draw_tip(self, cx, cy, radius, progress, color):
+        """Draw a bright dot at the arc tip"""
+        angle = math.radians(90 - 360 * progress)
+        x = cx + radius * math.cos(angle)
+        y = cy - radius * math.sin(angle)
+        bright = self._brighten(color, 0.6)
+        r = config.ARC_WIDTH_MAIN // 2 + 2
+        self.canvas.create_oval(x - r, y - r, x + r, y + r,
+                               fill=bright, outline="", tags="tip")
+        # Glow around tip
+        self.canvas.create_oval(x - r - 3, y - r - 3, x + r + 3, y + r + 3,
+                               fill="", outline=color, width=1, tags="tip")
+
+    @staticmethod
+    def _brighten(hex_color, amount):
+        h = hex_color.lstrip("#")
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        r = min(255, int(r + (255 - r) * amount))
+        g = min(255, int(g + (255 - g) * amount))
+        b = min(255, int(b + (255 - b) * amount))
+        return f"#{r:02x}{g:02x}{b:02x}"
 
 
 class GaugeIndicator:
-    """Enhanced gauge indicator with animated needle"""
+    """Enhanced gauge indicator with glowing semicircle and animated needle"""
     
     def __init__(self, parent, size=100, color=config.COLOR_TIMER):
         self.size = size
         self.color = color
         self.canvas = tk.Canvas(parent, width=size, height=size,
-                               bg=config.BG_COLOR, highlightthickness=0, bd=0)
+                               bg=config.SYS_BAR_BG, highlightthickness=0, bd=0)
         self.progress = 0
         self.target_progress = 0
-        self.current_needle_angle = 180  # Start position
+        self.current_needle_angle = 180
         self.animation_id = None
         
     def pack(self, **kwargs):
         self.canvas.pack(**kwargs)
         
     def update(self, progress, text="", color=None):
-        """Update with smooth needle animation"""
         if color is None:
             color = self.color
-            
         self.target_progress = min(1.0, max(0.0, progress))
         self.color = color
-        
-        # Start animation if not already running
         if self.animation_id is None:
             self._animate_gauge()
             
     def _animate_gauge(self):
-        """Animate gauge needle"""
         diff = self.target_progress - self.progress
-        
-        if abs(diff) < 0.01:
+        if abs(diff) < 0.005:
             self.progress = self.target_progress
             self._draw()
+            self.animation_id = None
             return
-            
-        # Smooth interpolation
-        self.progress += diff * 0.1
+        self.progress += diff * 0.12
         self._draw()
         self.animation_id = self.canvas.after(16, self._animate_gauge)
         
     def _draw(self):
-        """Draw the gauge"""
         self.canvas.delete("all")
-        
-        cx, cy = self.size // 2, self.size // 2 + 10
-        radius = self.size // 2 - 15
-        
-        # Draw background arc (semicircle)
-        self._draw_semicircle(cx, cy, radius, 1.0, config.SYS_BAR_BG, width=10)
-        
-        # Draw progress arc with glow
+        cx, cy = self.size // 2, self.size // 2 + 8
+        radius = self.size // 2 - 16
+        main_w = config.ARC_WIDTH_MAIN
+        glow_w = config.ARC_WIDTH_GLOW
+
+        # Background semicircle
+        self._draw_semicircle(cx, cy, radius, 1.0, config.SYS_BAR_BG, width=main_w)
+
         if self.progress > 0:
-            # Glow effect
-            for i in range(2):
+            # Glow layers
+            for i in range(config.ARC_GLOW_LAYERS, 0, -1):
                 r = radius + i * 3
-                self._draw_semicircle(cx, cy, r, self.progress, self.color, width=2)
-                
+                w = max(1, glow_w - i)
+                self._draw_semicircle(cx, cy, r, self.progress, self.color, width=w)
+
+            # Inner glow
+            self._draw_semicircle(cx, cy, radius - 2, self.progress,
+                                  CircleIndicator._brighten(self.color, 0.4), width=3)
+
             # Main arc
-            self._draw_semicircle(cx, cy, radius, self.progress, self.color, width=10)
-        
-        # Draw needle with smooth rotation
+            self._draw_semicircle(cx, cy, radius, self.progress, self.color, width=main_w)
+
+        # Needle with smooth rotation
         target_angle = 180 + 180 * self.progress
-        self.current_needle_angle += (target_angle - self.current_needle_angle) * 0.1
-        self._draw_needle(cx, cy, radius - 15, self.current_needle_angle, self.color)
+        self.current_needle_angle += (target_angle - self.current_needle_angle) * 0.12
+        self._draw_needle(cx, cy, radius - 10, self.current_needle_angle, self.color)
         
-        # Draw center text
+        # Center text
         text = f"{int(self.progress * 100)}%"
-        self.canvas.create_text(cx, cy - 10, text=text,
+        self.canvas.create_text(cx, cy - 8, text=text,
                                font=config.FONT_CIRCLE, fill=config.TEXT_PRIMARY)
         
     def _draw_semicircle(self, cx, cy, radius, progress, color, width=10):
-        """Draw a semicircle"""
         start_angle = 180
         extent = 180 * progress
-        
         points = []
-        steps = max(2, int(36 * progress))
+        steps = max(3, int(36 * progress))
         for i in range(steps + 1):
             angle = math.radians(start_angle + (extent * i / steps))
             x = cx + radius * math.cos(angle)
             y = cy - radius * math.sin(angle)
             points.append((x, y))
-        
         for i in range(len(points) - 1):
             self.canvas.create_line(points[i], points[i+1],
                                    fill=color, width=width, capstyle=tk.ROUND)
     
     def _draw_needle(self, cx, cy, length, angle_degrees, color):
-        """Draw the needle"""
         angle = math.radians(angle_degrees)
         x = cx + length * math.cos(angle)
         y = cy - length * math.sin(angle)
         
-        # Needle root
-        self.canvas.create_oval(cx-4, cy-4, cx+4, cy+4, 
-                               fill=color, outline="")
-        # Needle line
+        # Needle shadow
+        self.canvas.create_line(cx + 1, cy + 1, x + 1, y + 1,
+                               fill="#000000", width=4, capstyle=tk.ROUND)
+        # Needle body
         self.canvas.create_line(cx, cy, x, y, fill=color, width=3, capstyle=tk.ROUND)
+        # Needle center dot
+        self.canvas.create_oval(cx - 5, cy - 5, cx + 5, cy + 5,
+                               fill=color, outline="", width=0)
+        bright = CircleIndicator._brighten(color, 0.5)
+        self.canvas.create_oval(cx - 3, cy - 3, cx + 3, cy + 3,
+                               fill=bright, outline="", width=0)
+
+
+class SystemMetricCard:
+    """Compact icon card with a progress bar for system metrics."""
+
+    def __init__(self, parent, title: str, icon: str, accent_color: str):
+        self._title = title
+        self._icon = icon
+        self._accent_color = accent_color
+        self._ratio = 0.0
+        self._value_text = "--"
+
+        self.frame = tk.Frame(
+            parent,
+            bg=config.SYS_CARD_BG,
+            highlightbackground=config.BORDER_LIGHT,
+            highlightthickness=1,
+        )
+
+        header = tk.Frame(self.frame, bg=config.SYS_CARD_BG)
+        header.pack(fill="x", padx=8, pady=(5, 1))
+
+        tk.Label(
+            header,
+            text=f"{icon} {title}",
+            font=config.FONT_SYS_CARD_TITLE,
+            fg=config.TEXT_SECONDARY,
+            bg=config.SYS_CARD_BG,
+        ).pack(side="left")
+
+        self._value_var = tk.StringVar(value="--")
+        tk.Label(
+            header,
+            textvariable=self._value_var,
+            font=config.FONT_SYS_CARD_VALUE,
+            fg=config.TEXT_PRIMARY,
+            bg=config.SYS_CARD_BG,
+        ).pack(side="right")
+
+        self._bar = tk.Canvas(
+            self.frame,
+            height=7,
+            bg=config.SYS_CARD_BG,
+            highlightthickness=0,
+            bd=0,
+        )
+        self._bar.pack(fill="x", padx=8, pady=(1, 6))
+        self._bar.bind("<Configure>", lambda e: self._draw_bar())
+
+    def grid(self, **kwargs):
+        self.frame.grid(**kwargs)
+
+    def update(self, value_text: str, ratio: float | None, accent_color: str | None = None):
+        self._value_var.set(value_text)
+        self._value_text = value_text
+        self._ratio = 0.0 if ratio is None else max(0.0, min(1.0, ratio))
+        if accent_color is not None:
+            self._accent_color = accent_color
+        self._draw_bar()
+
+    def _draw_bar(self):
+        self._bar.delete("all")
+        w = self._bar.winfo_width()
+        h = self._bar.winfo_height()
+        if w <= 2 or h <= 2:
+            return
+
+        bg = config.SYS_BAR_EMPTY
+        fg = self._accent_color
+
+        self._bar.create_rectangle(2, 1, w - 2, h - 1, fill=bg, outline="")
+        fill_w = int((w - 4) * self._ratio)
+        if fill_w > 0:
+            self._bar.create_rectangle(2, 1, 2 + fill_w, h - 1, fill=fg, outline="")
+
+        # End cap for a more polished look
+        cap_x = min(w - 3, 2 + fill_w)
+        if fill_w > 0:
+            self._bar.create_oval(cap_x - 3, 0, cap_x + 3, h, fill=fg, outline="")
 
 
 class ClockWindow:
@@ -221,6 +316,7 @@ class ClockWindow:
         self._med_minute = settings.get("med_minute", 40)
 
         self._sys_cpu_temp = None
+        self._sys_cpu_util = 0.0
         self._sys_gpu_temp = None
         self._sys_vram_used = 0.0
         self._sys_vram_total = 0.0
@@ -230,8 +326,17 @@ class ClockWindow:
         self._sys_ram_pct = 0.0
         self._sys_gpu_util = 0.0
 
+        self._weather_location = "--"
+        self._weather_icon = "⛅"
+        self._weather_temp = None
+        self._weather_wind = None
+        self._weather_rain = None
+        self._weather_description = "--"
+        self._var_weather_main = tk.StringVar(value="⏳ 載入中...")
+
         self._drag_x = 0
         self._drag_y = 0
+        self._resize_edge = None
 
         self._particle_system = None
         self._water_goal_celebrated = False
@@ -268,6 +373,7 @@ class ClockWindow:
 
     def set_system_monitor(self, monitor):
         self._sys_cpu_temp = monitor.cpu_temp
+        self._sys_cpu_util = monitor.cpu_util
         self._sys_gpu_temp = monitor.gpu_temp
         self._sys_vram_used = monitor.vram_used
         self._sys_vram_total = monitor.vram_total
@@ -276,6 +382,15 @@ class ClockWindow:
         self._sys_ram_total = monitor.ram_total
         self._sys_ram_pct = monitor.ram_pct
         self._sys_gpu_util = monitor.gpu_util
+
+    def set_weather(self, snapshot):
+        self._weather_location = getattr(snapshot, "location", "--") or "--"
+        self._weather_icon = getattr(snapshot, "icon", "⛅") or "⛅"
+        self._weather_temp = getattr(snapshot, "temperature_c", None)
+        self._weather_wind = getattr(snapshot, "wind_kmh", None)
+        self._weather_rain = getattr(snapshot, "rain_mm", None)
+        self._weather_description = getattr(snapshot, "description", "--") or "--"
+        self._update_weather_display()
 
     def get_position(self) -> tuple[int, int]:
         return self._root.winfo_x(), self._root.winfo_y()
@@ -289,24 +404,59 @@ class ClockWindow:
         root.configure(bg=config.BORDER_COLOR)
         root.resizable(False, False)
 
-        # 外層邊框
-        outer = tk.Frame(root, bg=config.BORDER_COLOR,
-                         padx=config.WINDOW_BORDER, pady=config.WINDOW_BORDER)
-        outer.pack(fill="both", expand=True)
+        # 外層脈衝邊框
+        self._border_frame = tk.Frame(root, bg=config.BORDER_PULSE_1,
+                                      padx=config.WINDOW_BORDER, pady=config.WINDOW_BORDER)
+        self._border_frame.pack(fill="both", expand=True)
+        self._pulse_phase = 0.0
 
         # 主內容區
-        self._main = tk.Frame(outer, bg=config.BG_COLOR,
-                              width=config.WINDOW_WIDTH,
-                              height=config.WINDOW_HEIGHT)
+        self._main = tk.Frame(self._border_frame, bg=config.BG_GRADIENT_TOP)
         self._main.pack(fill="both", expand=True)
-        self._main.pack_propagate(False)
 
         self._build_titlebar()
         self._build_clock_area()
-        self._build_indicators_area()
         self._build_info_area()
         self._build_sys_area()
         self._setup_drag()
+        self._start_pulse_border()
+
+    def _start_pulse_border(self):
+        """Start pulsing border color animation"""
+        self._pulse_border()
+
+    def _pulse_border(self):
+        """Animate border color through gradient palette"""
+        import math
+        self._pulse_phase += config.PULSE_BORDER_SPEED
+        if self._pulse_phase > 2 * math.pi:
+            self._pulse_phase -= 2 * math.pi
+
+        p = self._pulse_phase
+        c1 = self._hex_to_rgb(config.BORDER_PULSE_1)
+        c2 = self._hex_to_rgb(config.BORDER_PULSE_2)
+        c3 = self._hex_to_rgb(config.BORDER_PULSE_3)
+
+        t = (math.sin(p) + 1) / 2
+        if t < 0.5:
+            t2 = t * 2
+            r = int(c1[0] + (c2[0] - c1[0]) * t2)
+            g = int(c1[1] + (c2[1] - c1[1]) * t2)
+            b = int(c1[2] + (c2[2] - c1[2]) * t2)
+        else:
+            t2 = (t - 0.5) * 2
+            r = int(c2[0] + (c3[0] - c2[0]) * t2)
+            g = int(c2[1] + (c3[1] - c2[1]) * t2)
+            b = int(c2[2] + (c3[2] - c2[2]) * t2)
+
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        self._border_frame.config(bg=color)
+        self._root.after(33, self._pulse_border)
+
+    @staticmethod
+    def _hex_to_rgb(hex_color):
+        h = hex_color.lstrip("#")
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
 
     def _build_titlebar(self):
         bar = tk.Frame(self._main, bg=config.BG_SECONDARY, height=32)
@@ -327,6 +477,13 @@ class ClockWindow:
                  font=config.FONT_TITLE,
                  fg=config.TEXT_PRIMARY, bg=config.BG_SECONDARY).pack(side="left", padx=6)
 
+        # 時鐘（放在標題與設定之間）
+        self._var_time = tk.StringVar(value="--:--:--")
+        self._lbl_time = tk.Label(bar, textvariable=self._var_time,
+                                  font=("Consolas", 11, "bold"),
+                                  fg=config.CLOCK_COLOR, bg=config.BG_SECONDARY)
+        self._lbl_time.pack(side="left", padx=6)
+
         # 設定按鈕
         cfg_btn = tk.Label(bar, text="⚙ 設定", font=config.FONT_LABEL,
                            fg=config.TEXT_SECONDARY, bg=config.BG_SECONDARY,
@@ -340,59 +497,49 @@ class ClockWindow:
         bar.bind("<B1-Motion>", self._do_drag)
 
     def _build_clock_area(self):
-        clock_frame = tk.Frame(self._main, bg=config.BG_COLOR)
-        clock_frame.pack(fill="x", padx=16, pady=(8, 0))
+        # 左右並排：左邊指示器，右邊天氣+日期
+        row1 = tk.Frame(self._main, bg=config.BG_COLOR)
+        row1.pack(fill="x", padx=16, pady=(8, 4))
+        row1.columnconfigure(0, weight=1)
+        row1.columnconfigure(1, weight=0)
 
-        self._var_time = tk.StringVar(value="--:--:--")
+        # ── 左側：指示器 ──
+        left = tk.Frame(row1, bg=config.BG_COLOR)
+        left.grid(row=0, column=0, sticky="w")
+
+        water_f = tk.Frame(left, bg=config.BG_COLOR)
+        water_f.pack(side="left", padx=(0, 12))
+        self._water_indicator = CircleIndicator(water_f, size=64, color=config.COLOR_WATER, bg_color=config.SYS_BAR_BG)
+        self._water_indicator.pack()
+        tk.Label(water_f, text="💧 喝水", font=config.FONT_SMALL, fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(2, 0))
+
+        timer_f = tk.Frame(left, bg=config.BG_COLOR)
+        timer_f.pack(side="left", padx=(0, 12))
+        self._timer_indicator = GaugeIndicator(timer_f, size=64, color=config.COLOR_TIMER)
+        self._timer_indicator.pack()
+        tk.Label(timer_f, text="⏱ 久坐", font=config.FONT_SMALL, fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(2, 0))
+
+        med_f = tk.Frame(left, bg=config.BG_COLOR)
+        med_f.pack(side="left")
+        self._med_indicator = CircleIndicator(med_f, size=64, color=config.COLOR_MED, bg_color=config.SYS_BAR_BG)
+        self._med_indicator.pack()
+        tk.Label(med_f, text="💊 用藥", font=config.FONT_SMALL, fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(2, 0))
+
+        # ── 右側：天氣+日期 ──
+        right = tk.Frame(row1, bg=config.BG_COLOR)
+        right.grid(row=0, column=1, sticky="ne", padx=(8, 0))
+
+        self._var_weather_location = tk.StringVar(value="天氣")
+        self._var_weather_main = tk.StringVar(value="⏳ 載入中...")
         self._var_date = tk.StringVar(value="")
 
-        tk.Label(clock_frame, textvariable=self._var_time,
-                 font=config.FONT_CLOCK,
-                 fg=config.CLOCK_COLOR, bg=config.BG_COLOR).pack(anchor="w")
-
-        tk.Label(clock_frame, textvariable=self._var_date,
-                 font=config.FONT_DATE,
-                 fg=config.DATE_COLOR, bg=config.BG_COLOR).pack(anchor="w", pady=(0, 4))
-
-    def _build_indicators_area(self):
-        """建構圖形化指示器區域"""
-        indicators_frame = tk.Frame(self._main, bg=config.BG_COLOR)
-        indicators_frame.pack(fill="x", padx=16, pady=(8, 8))
-
-        # 喝水圓形指示器
-        water_frame = tk.Frame(indicators_frame, bg=config.BG_COLOR)
-        water_frame.pack(side="left", padx=(0, 16))
-        
-        self._water_indicator = CircleIndicator(water_frame, size=70, 
-                                               color=config.COLOR_WATER,
-                                               bg_color=config.SYS_BAR_BG)
-        self._water_indicator.pack()
-        
-        tk.Label(water_frame, text="💧 喝水", font=config.FONT_SMALL,
-                 fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(4, 0))
-
-        # 久坐計時器
-        timer_frame = tk.Frame(indicators_frame, bg=config.BG_COLOR)
-        timer_frame.pack(side="left", padx=(0, 16))
-        
-        self._timer_indicator = GaugeIndicator(timer_frame, size=70,
-                                              color=config.COLOR_TIMER)
-        self._timer_indicator.pack()
-        
-        tk.Label(timer_frame, text="⏱ 久坐", font=config.FONT_SMALL,
-                 fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(4, 0))
-
-        # 用藥狀態
-        med_frame = tk.Frame(indicators_frame, bg=config.BG_COLOR)
-        med_frame.pack(side="left")
-        
-        self._med_indicator = CircleIndicator(med_frame, size=70,
-                                             color=config.COLOR_MED,
-                                             bg_color=config.SYS_BAR_BG)
-        self._med_indicator.pack()
-        
-        tk.Label(med_frame, text="💊 用藥", font=config.FONT_SMALL,
-                 fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(pady=(4, 0))
+        tk.Label(right, textvariable=self._var_weather_location,
+                 font=("Segoe UI", 9, "bold"), fg="#60a5fa", bg=config.BG_COLOR).pack(anchor="e")
+        tk.Label(right, textvariable=self._var_weather_main,
+                 font=("Segoe UI", 10), fg="#f8fafc", bg=config.BG_COLOR,
+                 justify="right").pack(anchor="e", pady=(2, 0))
+        tk.Label(right, textvariable=self._var_date,
+                 font=("Segoe UI", 8), fg=config.DATE_COLOR, bg=config.BG_COLOR).pack(anchor="e", pady=(4, 0))
 
     def _build_info_area(self):
         # 資訊顯示區
@@ -428,45 +575,27 @@ class ClockWindow:
         sys_header = tk.Frame(self._main, bg=config.BG_COLOR)
         sys_header.pack(fill="x", padx=16, pady=(0, 4))
         
-        tk.Label(sys_header, text="📊 系統監控", font=config.FONT_SMALL,
-                 fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(side="left")
+        tk.Label(sys_header, text="📊 系統監控", font=config.FONT_SYS_CARD_TITLE,
+                  fg=config.TEXT_SECONDARY, bg=config.BG_COLOR).pack(side="left")
 
-        # CPU/GPU 溫度
-        row1 = tk.Frame(self._main, bg=config.BG_COLOR)
-        row1.pack(fill="x", padx=16, pady=(0, 3))
+        grid = tk.Frame(self._main, bg=config.BG_COLOR)
+        grid.pack(fill="x", padx=16, pady=(0, 6))
+        grid.columnconfigure(0, weight=1)
+        grid.columnconfigure(1, weight=1)
 
-        self._var_cpu_temp = tk.StringVar(value="CPU: --°C")
-        self._lbl_cpu_temp = tk.Label(row1, textvariable=self._var_cpu_temp,
-                                      font=config.FONT_SYS, fg=config.SYS_COLOR, bg=config.BG_COLOR)
-        self._lbl_cpu_temp.pack(side="left")
+        self._cpu_card = SystemMetricCard(grid, "CPU", "🧠", config.SYS_TEMP_OK)
+        self._cpu_util_card = SystemMetricCard(grid, "CPU%", "📊", config.SYS_BAR_CPU)
+        self._gpu_card = SystemMetricCard(grid, "GPU", "🎮", config.SYS_TEMP_OK)
+        self._ram_card = SystemMetricCard(grid, "RAM", "🧩", config.SYS_BAR_RAM)
+        self._vram_card = SystemMetricCard(grid, "VRAM", "🖼", config.SYS_BAR_VRAM)
+        self._cuda_card = SystemMetricCard(grid, "CUDA", "⚡", config.SYS_BAR_CUDA)
 
-        self._var_gpu_temp = tk.StringVar(value="GPU: --°C")
-        self._lbl_gpu_temp = tk.Label(row1, textvariable=self._var_gpu_temp,
-                                      font=config.FONT_SYS, fg=config.SYS_COLOR, bg=config.BG_COLOR)
-        self._lbl_gpu_temp.pack(side="right")
-
-        # VRAM/RAM
-        row2 = tk.Frame(self._main, bg=config.BG_COLOR)
-        row2.pack(fill="x", padx=16, pady=(0, 3))
-
-        self._var_ram = tk.StringVar(value="RAM: --/--G")
-        self._lbl_ram = tk.Label(row2, textvariable=self._var_ram,
-                                 font=config.FONT_SYS, fg=config.SYS_COLOR, bg=config.BG_COLOR)
-        self._lbl_ram.pack(side="left")
-
-        self._var_vram = tk.StringVar(value="VRAM: --/--G")
-        self._lbl_vram = tk.Label(row2, textvariable=self._var_vram,
-                                  font=config.FONT_SYS, fg=config.SYS_COLOR, bg=config.BG_COLOR)
-        self._lbl_vram.pack(side="right")
-
-        # CUDA
-        row3 = tk.Frame(self._main, bg=config.BG_COLOR)
-        row3.pack(fill="x", padx=16, pady=(0, 6))
-
-        self._var_cuda = tk.StringVar(value="CUDA: --%")
-        self._lbl_cuda = tk.Label(row3, textvariable=self._var_cuda,
-                                  font=config.FONT_SYS, fg=config.SYS_COLOR, bg=config.BG_COLOR)
-        self._lbl_cuda.pack(side="left")
+        self._cpu_card.grid(row=0, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
+        self._cpu_util_card.grid(row=0, column=1, sticky="ew", padx=(4, 0), pady=(0, 4))
+        self._gpu_card.grid(row=1, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
+        self._ram_card.grid(row=1, column=1, sticky="ew", padx=(4, 0), pady=(0, 4))
+        self._vram_card.grid(row=2, column=0, sticky="ew", padx=(0, 4), pady=(0, 4))
+        self._cuda_card.grid(row=2, column=1, sticky="ew", padx=(4, 0), pady=(0, 4))
 
     # ── 更新顯示 ──────────────────────────────────────────
 
@@ -531,35 +660,60 @@ class ClockWindow:
         # CPU 溫度
         if self._sys_cpu_temp is not None:
             t = self._sys_cpu_temp
-            self._var_cpu_temp.set(f"CPU: {t:.0f}°C")
             color = self._temp_color(t)
-            self._lbl_cpu_temp.config(fg=color)
+            self._cpu_card.update(f"{t:.0f}°C", t / 100.0, color)
         else:
-            self._var_cpu_temp.set("CPU: --°C")
+            self._cpu_card.update("--", None, config.SYS_TEMP_OK)
+
+        # CPU 使用率
+        self._cpu_util_card.update(f"{self._sys_cpu_util:.0f}%", self._sys_cpu_util / 100.0, config.SYS_BAR_CPU)
 
         # GPU 溫度
         if self._sys_gpu_temp is not None:
             t = self._sys_gpu_temp
-            self._var_gpu_temp.set(f"GPU: {t:.0f}°C")
             color = self._temp_color(t)
-            self._lbl_gpu_temp.config(fg=color)
+            self._gpu_card.update(f"{t:.0f}°C", t / 100.0, color)
         else:
-            self._var_gpu_temp.set("GPU: --°C")
+            self._gpu_card.update("--", None, config.SYS_TEMP_OK)
 
         # RAM
         if self._sys_ram_total > 0:
-            self._var_ram.set(f"RAM: {self._sys_ram_used:.1f}/{self._sys_ram_total:.1f}G")
+            self._ram_card.update(
+                f"{self._sys_ram_used:.1f}/{self._sys_ram_total:.1f}G",
+                self._sys_ram_pct / 100.0,
+                config.SYS_BAR_RAM,
+            )
         else:
-            self._var_ram.set("RAM: --/--G")
+            self._ram_card.update("--", None, config.SYS_BAR_RAM)
 
         # VRAM
         if self._sys_vram_total > 0:
-            self._var_vram.set(f"VRAM: {self._sys_vram_used:.1f}/{self._sys_vram_total:.1f}G")
+            self._vram_card.update(
+                f"{self._sys_vram_used:.1f}/{self._sys_vram_total:.1f}G",
+                self._sys_vram_pct / 100.0,
+                config.SYS_BAR_VRAM,
+            )
         else:
-            self._var_vram.set("VRAM: --/--G")
+            self._vram_card.update("--", None, config.SYS_BAR_VRAM)
 
         # CUDA
-        self._var_cuda.set(f"CUDA: {self._sys_gpu_util:.0f}%")
+        self._cuda_card.update(f"{self._sys_gpu_util:.0f}%", self._sys_gpu_util / 100.0, config.SYS_BAR_CUDA)
+
+    def _update_weather_display(self):
+        temp_text = "--°C"
+        if self._weather_temp is not None:
+            temp_text = f"{self._weather_temp:.0f}°C"
+
+        wind_text = "--"
+        if self._weather_wind is not None:
+            wind_text = f"{self._weather_wind:.0f} km/h"
+
+        rain_text = "--"
+        if self._weather_rain is not None:
+            rain_text = f"{self._weather_rain:.1f} mm"
+
+        self._var_weather_location.set(f"📍 {self._weather_location}")
+        self._var_weather_main.set(f"{self._weather_icon} {temp_text}\n💨 {wind_text}\n🌧 {rain_text}")
 
     @staticmethod
     def _temp_color(temp: float) -> str:
@@ -572,15 +726,14 @@ class ClockWindow:
     # ── 粒子效果 ──────────────────────────────────────────
 
     def _setup_particles(self) -> None:
-        """Setup particle system for visual effects"""
-        try:
-            from ui.particles import ParticleSystem
-            self._particle_canvas = tk.Canvas(self._main, bg=config.BG_COLOR,
-                                             highlightthickness=0, bd=0)
-            self._particle_canvas.place(relx=0, rely=0, relwidth=1, relheight=1)
-            self._particle_system = ParticleSystem(self._particle_canvas)
-        except ImportError:
-            self._particle_system = None
+        """Setup particle system for visual effects.
+
+        Note: Particle canvas overlay was removed because ``place()`` with
+        full coverage blocked all underlying UI widgets.  Particles are
+        currently disabled; re-enable by creating a dedicated canvas that
+        does not occlude the main frame.
+        """
+        self._particle_system = None
 
     def _celebrate_water_goal(self) -> None:
         """Emit confetti once when water goal is reached.
@@ -605,35 +758,144 @@ class ClockWindow:
             self._particle_system.clear()
             self._particle_system = None
 
-    # ── 拖曳 ──────────────────────────────────────────────
+    # ── 拖曳與縮放 ──────────────────────────────────────
+
+    _EDGE = 6  # 邊緣感應寬度
 
     def _setup_drag(self):
         self._main.bind("<ButtonPress-1>", self._start_drag)
         self._main.bind("<B1-Motion>", self._do_drag)
+        self._root.bind("<Motion>", self._edge_cursor)
+        self._root.bind("<ButtonRelease-1>", self._end_resize)
+
+    def _edge_cursor(self, event):
+        """靠近邊緣時改變游標"""
+        w = self._root.winfo_width()
+        h = self._root.winfo_height()
+        e = self._EDGE
+        x, y = event.x, event.y
+
+        on_right = x >= w - e
+        on_left = x <= e
+        on_bottom = y >= h - e
+        on_top = y <= e
+
+        if on_right and on_bottom:
+            self._root.config(cursor="size_nw_se")
+        elif on_left and on_top:
+            self._root.config(cursor="size_nw_se")
+        elif on_right and on_top:
+            self._root.config(cursor="size_ne_sw")
+        elif on_left and on_bottom:
+            self._root.config(cursor="size_ne_sw")
+        elif on_right:
+            self._root.config(cursor="sb_h_double_arrow")
+        elif on_left:
+            self._root.config(cursor="sb_h_double_arrow")
+        elif on_bottom:
+            self._root.config(cursor="sb_v_double_arrow")
+        elif on_top:
+            self._root.config(cursor="sb_v_double_arrow")
+        else:
+            self._root.config(cursor="")
 
     def _start_drag(self, event):
+        w = self._root.winfo_width()
+        h = self._root.winfo_height()
+        e = self._EDGE
+        x, y = event.x, event.y
+
+        # 判斷是否在邊緣（縮放模式）
+        on_right = x >= w - e
+        on_left = x <= e
+        on_bottom = y >= h - e
+        on_top = y <= e
+
+        self._resize_edge = None
+        if on_right and on_bottom:
+            self._resize_edge = "se"
+        elif on_left and on_top:
+            self._resize_edge = "nw"
+        elif on_right and on_top:
+            self._resize_edge = "ne"
+        elif on_left and on_bottom:
+            self._resize_edge = "sw"
+        elif on_right:
+            self._resize_edge = "e"
+        elif on_left:
+            self._resize_edge = "w"
+        elif on_bottom:
+            self._resize_edge = "s"
+        elif on_top:
+            self._resize_edge = "n"
+
+        if self._resize_edge:
+            self._resize_start_x = event.x_root
+            self._resize_start_y = event.y_root
+            self._resize_start_geo = self._root.geometry()
+            return
+
+        # 拖曳模式
         self._drag_x = event.x_root - self._root.winfo_x()
         self._drag_y = event.y_root - self._root.winfo_y()
 
     def _do_drag(self, event):
-        x = event.x_root - self._drag_x
-        y = event.y_root - self._drag_y
-        sw = self._root.winfo_screenwidth()
-        sh = self._root.winfo_screenheight()
-        x = max(0, min(x, sw - config.WINDOW_WIDTH))
-        y = max(0, min(y, sh - config.WINDOW_HEIGHT))
-        self._root.geometry(f"+{x}+{y}")
+        if self._resize_edge:
+            dx = event.x_root - self._resize_start_x
+            dy = event.y_root - self._resize_start_y
+            geo = self._resize_start_geo
+            # 解析目前幾何 "WxH+X+Y"
+            parts = geo.replace("x", "+").split("+")
+            cur_w, cur_h, cur_x, cur_y = int(parts[0]), int(parts[1]), int(parts[2]), int(parts[3])
+            min_w, min_h = 200, 200
+            edge = self._resize_edge
+
+            new_x, new_y = cur_x, cur_y
+            new_w, new_h = cur_w, cur_h
+
+            if "e" in edge:
+                new_w = max(min_w, cur_w + dx)
+            if "w" in edge:
+                new_w = max(min_w, cur_w - dx)
+                new_x = cur_x + (cur_w - new_w)
+            if "s" in edge:
+                new_h = max(min_h, cur_h + dy)
+            if "n" in edge:
+                new_h = max(min_h, cur_h - dy)
+                new_y = cur_y + (cur_h - new_h)
+
+            self._root.geometry(f"{new_w}x{new_h}+{new_x}+{new_y}")
+        else:
+            x = event.x_root - self._drag_x
+            y = event.y_root - self._drag_y
+            sw = self._root.winfo_screenwidth()
+            sh = self._root.winfo_screenheight()
+            geo = self._root.geometry()
+            parts = geo.replace("x", "+").split("+")
+            w, h = int(parts[0]), int(parts[1])
+            x = max(0, min(x, sw - w))
+            y = max(0, min(y, sh - h))
+            self._root.geometry(f"+{x}+{y}")
+
+    def _end_resize(self, event):
+        self._resize_edge = None
 
     # ── 位置 ──────────────────────────────────────────────
 
     def _place_window(self):
         x = self._settings.get("window_x", -1)
         y = self._settings.get("window_y", -1)
+        # 先讓內容自動計算高度
         self._root.update_idletasks()
+        req_h = self._root.winfo_reqheight()
+        req_w = self._root.winfo_reqwidth()
+        # 至少保持最小尺寸
+        win_w = max(config.WINDOW_WIDTH, req_w)
+        win_h = max(config.WINDOW_HEIGHT, req_h)
         if x < 0 or y < 0:
             sw = self._root.winfo_screenwidth()
             sh = self._root.winfo_screenheight()
-            x = sw - config.WINDOW_WIDTH - 20
-            y = sh - config.WINDOW_HEIGHT - 50
+            x = sw - win_w - 20
+            y = sh - win_h - 50
         self._root.geometry(
-            f"{config.WINDOW_WIDTH}x{config.WINDOW_HEIGHT}+{x}+{y}")
+            f"{win_w}x{win_h}+{x}+{y}")

@@ -250,58 +250,20 @@ class ReminderWindow:
         dialog.attributes("-alpha", alpha)
 
     def _animate_dialog_entrance(self, dialog: tk.Toplevel):
-        """以縮放與淡入動畫呈現對話框"""
-        dialog.scale = config.DIALOG_START_SCALE
-        dialog.alpha = 0.0
-        step = 0
-        total_steps = self._ANIM_STEP_COUNT
+        """立即顯示提醒視窗，避免透明動畫造成空白或黑幕。"""
+        self._apply_dialog_geometry(dialog, 1.0, 1.0)
+        dialog.lift()
+        dialog.focus_force()
 
-        def animate_step():
-            nonlocal step
-            step += 1
-            t = step / total_steps
-            eased = EasingFunctions.ease_out_cubic(t)
-
-            dialog.scale = config.DIALOG_START_SCALE + (1.0 - config.DIALOG_START_SCALE) * eased
-            dialog.alpha = min(1.0, eased)
-
-            if step >= total_steps:
-                dialog.scale = 1.0
-                dialog.alpha = 1.0
-                self._apply_dialog_geometry(dialog, 1.0, 1.0)
-                return
-
-            self._apply_dialog_geometry(dialog, dialog.scale, dialog.alpha)
-            dialog.after(config.ANIM_FAST, animate_step)
-
-        animate_step()
-
-    def _animate_dialog_exit(self, dialog: tk.Toplevel, overlay: tk.Toplevel,
+    def _animate_dialog_exit(self, dialog: tk.Toplevel, overlay: tk.Toplevel | None,
                              callback=None):
-        """以縮放與淡出動畫關閉對話框"""
-        step = 0
-        total_steps = self._ANIM_STEP_COUNT
-
-        def animate_step():
-            nonlocal step
-            step += 1
-            t = step / total_steps
-            eased = EasingFunctions.ease_in_cubic(t)
-
-            scale = max(0.0, 1.0 - eased)
-            alpha = max(0.0, 1.0 - eased)
-
-            if step >= total_steps:
-                dialog.destroy()
-                overlay.destroy()
-                if callback:
-                    callback()
-                return
-
-            self._apply_dialog_geometry(dialog, scale, alpha)
-            dialog.after(config.ANIM_FAST, animate_step)
-
-        animate_step()
+        """立即關閉提醒視窗，避免關閉動畫卡住輸入。"""
+        if dialog.winfo_exists():
+            dialog.destroy()
+        if overlay is not None and overlay.winfo_exists():
+            overlay.destroy()
+        if callback:
+            callback()
 
     def _show(self, title: str, icon: str, lines: list[str],
               buttons: list[tuple[str, Callable | None]],
@@ -316,14 +278,8 @@ class ReminderWindow:
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
 
-        # ── 遮罩層 ──────────────────────────────────────
-        overlay = tk.Toplevel(self._root)
-        overlay.geometry(f"{sw}x{sh}+0+0")
-        overlay.overrideredirect(True)
-        overlay.attributes("-topmost", True)
-        overlay.attributes("-alpha", config.OVERLAY_ALPHA)
-        overlay.configure(bg=config.OVERLAY_COLOR)
-        overlay.update()
+        # 不使用全螢幕遮罩。遮罩若蓋住對話框會讓使用者無法回到 Windows。
+        overlay = None
 
         # ── 對話框 ──────────────────────────────────────
         dw, dh = self._DIALOG_WIDTH, self._DIALOG_HEIGHT
@@ -387,9 +343,9 @@ class ReminderWindow:
             if closed[0]:
                 return
             closed[0] = True
-            guard_id[0] and dlg.after_cancel(guard_id[0])
             icon_widget.stop_animation()
-            dlg.grab_release()
+            dlg.unbind_all("<Escape>")
+            dlg.unbind_all("<Return>")
 
             def on_animation_done():
                 if extra_cb:
@@ -452,20 +408,15 @@ class ReminderWindow:
                  font=config.FONT_SMALL,
                  fg=config.TEXT_MUTED, bg=config.BG_COLOR).pack(pady=(14, 0))
 
-        # ── 輸入鎖定 ──────────────────────────────────────
-        dlg.grab_set()
+        # ── 輸入處理 ──────────────────────────────────────
+        # 不使用 grab_set，避免提醒視窗異常時鎖住整個桌面。
         dlg.focus_force()
         dlg.bind("<Escape>", lambda e: _close())
         dlg.bind("<Return>", lambda e: _close())
+        dlg.bind_all("<Escape>", lambda e: _close())
+        dlg.bind_all("<Return>", lambda e: _close())
 
         # 開始入場動畫
         self._animate_dialog_entrance(dlg)
 
-        guard_id = [None]
-
-        def _guard():
-            if not closed[0] and dlg.winfo_exists():
-                dlg.focus_force()
-                guard_id[0] = dlg.after(200, _guard)
-
-        guard_id[0] = dlg.after(200, _guard)
+        dlg.after(50, lambda: (dlg.lift(), dlg.focus_force()))

@@ -10,11 +10,14 @@
 
 | 功能 | 說明 |
 |------|------|
-| 🕐 **桌面時鐘** | 大字體時鐘常駐螢幕角落，始終置頂，可自由拖曳 |
+| 🕐 **桌面時鐘** | 時鐘顯示於抬頭列，始終置頂，可自由拖曳 |
 | 🏃 **久坐提醒** | 每 50 分鐘強制彈出提醒，必須按 OK 或 ESC 才能繼續操作 |
-| 💧 **喝水追蹤** | 記錄每日飲水量，顯示進度條，不定期提醒補水 |
+| 💧 **喝水追蹤** | 記錄每日飲水量，圓形進度指示器，不定期提醒補水 |
 | ⏰ **下班前提醒** | 下班前 30 分鐘，若未達喝水目標自動提醒 |
 | 💊 **用藥提醒** | 每日 13:40 提醒服藥，服藥後顯示「已服 ✓」，跨重開機保留記錄 |
+| 🌤️ **即時天氣** | 自動偵測所在地，顯示溫度、風速、降雨（Open-Meteo API，無需 Key） |
+| 🖥️ **系統監控** | CPU/GPU 溫度、CPU 忙碌度、RAM/VRAM 用量、CUDA 使用率 |
+| 📐 **可調大小** | 視窗邊緣可拖曳調整大小，自動記住位置 |
 | ⚙️ **彈性設定** | 下班時間、喝水目標、提醒間隔、用藥時間均可調整 |
 | 🚀 **開機自動啟動** | 登入後自動在背景啟動，無需手動開啟 |
 
@@ -23,19 +26,25 @@
 ## 🖥️ 介面預覽
 
 ```
-┌──────────────────────────────────────┐
-│ ✕  💝 健康小幫手              ⚙ 設定 │
-│                                      │
-│           15:30:22                   │
-│        2026-05-25  週一               │
-│  ─────────────────────────────────  │
-│  💧 ████████░░  1400/2000ml          │
-│  ⏱ 下次起身：23:15                   │
-│  💊 今日用藥：13:40                   │
-└──────────────────────────────────────┘
+╔══════════════════════════════════════════╗
+║ ✕ 💝 健康小幫手   16:13:59    ⚙ 設定    ║
+╠══════════════════════════════════════════╣
+║  💧 喝水   ⏱ 久坐   💊 用藥    📍 花蓮  ║
+║                                     ☀27°C║
+║                                    💨1.6 ║
+║                                    🌧0.4 ║
+║                                 06/10 週三║
+╠══════════════════════════════════════════╣
+║  0/2000ml    起身：47:42     用藥：13:40  ║
+╠══════════════════════════════════════════╣
+║ 📊 系統監控                               ║
+║ 🧠CPU 41°C    📊CPU% 15%                ║
+║ 🎮GPU 57°C    🧩RAM 15.2/63.9G          ║
+║ 🖼VRAM 1.6G   ⚡CUDA 2%                 ║
+╚══════════════════════════════════════════╝
 ```
 
-深紫色系可愛風格，薰衣草紫邊框，支援高 DPI 螢幕。
+深色主題，脈衝漸變邊框，圓形進度指示器，支援高 DPI 螢幕。
 
 ---
 
@@ -44,12 +53,12 @@
 ### 系統需求
 
 - Windows 10 / 11
-- Python 3.10+（[下載 Python](https://www.python.org/downloads/)）
+- Python 3.10+（若系統有 `winget`，可由一鍵啟動自動安裝）
 
 ### 安裝與啟動
 
 1. 下載或 Clone 此專案
-2. 雙擊 `start.bat`（第一次執行會自動建立虛擬環境，約 10 秒）
+2. 雙擊 `start.bat` 或 `一鍵啟動.bat`（第一次執行會自動偵測 Python、建立虛擬環境、安裝依賴，並加入 Windows 開機啟動）
 3. 時鐘視窗出現於螢幕右下角，可拖曳到任意位置
 
 ```bash
@@ -58,67 +67,34 @@ cd office-health-clock
 start.bat
 ```
 
-> **零額外套件**：純 Python 標準函式庫，無需 `pip install` 任何第三方套件。
+> **自動布署**：啟動器會自動偵測 Python（py / python / winget），建立虛擬環境，安裝依賴。可選依賴安裝失敗時主程式仍可降級運作。
 
-### 設定開機自動啟動
+---
 
-專案內已附 `startup.vbs`，搭配本機啟動器可實現開機自動啟動，**適合程式放在 Google Drive / OneDrive 等雲端磁碟的使用者**（會等待磁碟掛載後才啟動）。
+## 🌤️ 天氣功能
 
-#### Step 1 — 建立本機啟動器
+- 自動透過 IP 偵測所在縣市
+- 使用 [Open-Meteo](https://open-meteo.com/) 免費 API，無需 API Key
+- 顯示：溫度、風速、降雨量
+- 啟動時抓取一次，之後每 2 小時更新
 
-新增檔案 `C:\Users\<你的帳號>\HealthClock_launcher.vbs`，內容如下：
+---
 
-> ⚠️ 此檔案必須以 **Unicode（UTF-16 LE）** 編碼儲存，否則中文路徑無法正確讀取。
-> 建議用 PowerShell 建立（見下方指令），或用記事本另存為「Unicode」格式。
+## 🖥️ 系統監控
 
-```vbscript
-Dim WShell, fso, vbsPath, waited
-Set WShell = CreateObject("WScript.Shell")
-Set fso = CreateObject("Scripting.FileSystemObject")
-vbsPath = "C:\<你的專案完整路徑>\startup.vbs"   ' ← 改成你的實際路徑
+使用以下方式讀取硬體資訊：
 
-waited = 0
-Do While Not fso.FileExists(vbsPath)
-    WScript.Sleep 2000
-    waited = waited + 2
-    If waited >= 60 Then WScript.Quit
-Loop
+| 指標 | 來源 |
+|------|------|
+| CPU 溫度 | LibreHardwareMonitor DLL（pythonnet）/ PowerShell helper |
+| CPU 忙碌度 | psutil |
+| GPU 溫度 | pynvml (NVIDIA) |
+| GPU 使用率 | pynvml (NVIDIA) |
+| RAM | psutil |
+| VRAM | pynvml (NVIDIA) |
+| CUDA 使用率 | pynvml (NVIDIA) |
 
-WShell.Run "wscript.exe " & Chr(34) & vbsPath & Chr(34), 0, False
-```
-
-**用 PowerShell 自動建立（推薦）：**
-
-```powershell
-# 在 PowerShell 中執行，將路徑改為你的實際路徑
-$content = @"
-Dim WShell, fso, vbsPath, waited
-Set WShell = CreateObject("WScript.Shell")
-Set fso = CreateObject("Scripting.FileSystemObject")
-vbsPath = "C:\你的專案路徑\startup.vbs"
-
-waited = 0
-Do While Not fso.FileExists(vbsPath)
-    WScript.Sleep 2000
-    waited = waited + 2
-    If waited >= 60 Then WScript.Quit
-Loop
-
-WShell.Run "wscript.exe " & Chr(34) & vbsPath & Chr(34), 0, False
-"@
-[System.IO.File]::WriteAllText(
-    "$env:USERPROFILE\HealthClock_launcher.vbs",
-    $content,
-    [System.Text.Encoding]::Unicode
-)
-```
-
-#### Step 2 — 加入 Windows 啟動資料夾
-
-1. 按 `Win + R` → 輸入 `shell:startup` → Enter
-2. 在開啟的資料夾中，為 `HealthClock_launcher.vbs` 建立捷徑
-
-**取消自動啟動：** 刪除啟動資料夾中的捷徑即可。
+> CPU 溫度需要管理員權限，透過背景 PowerShell helper 以 elevated 方式執行。
 
 ---
 
@@ -142,21 +118,30 @@ WShell.Run "wscript.exe " & Chr(34) & vbsPath & Chr(34), 0, False
 
 ```
 office-health-clock/
-├── start.bat              # 一鍵啟動
-├── startup.vbs            # 無聲啟動器（供開機自動啟動使用）
-├── main.py                # 主程式入口
-├── config.py              # 顏色、字體、常數
-├── requirements.txt       # 無第三方套件
+├── start.bat                # 一鍵啟動（自動偵測 Python）
+├── 一鍵啟動.bat             # 中文版啟動器
+├── startup.vbs              # 無聲啟動器（供開機自動啟動）
+├── ensure_startup_shortcut.ps1  # 自動建立啟動資料夾捷徑
+├── cpu_temp_helper.ps1      # 背景 CPU 溫度讀取（管理員權限）
+├── main.py                  # 主程式入口
+├── config.py                # 顏色、字體、常數
+├── requirements.txt         # 核心依賴（psutil, pynvml）
+├── requirements-optional.txt # 可選依賴（pythonnet）
 ├── ui/
-│   ├── clock_window.py    # 主時鐘視窗
-│   ├── reminder_window.py # 強制確認提醒視窗
-│   └── water_panel.py     # 喝水快選面板
+│   ├── clock_window.py      # 主時鐘視窗（含天氣、系統監控）
+│   ├── reminder_window.py   # 強制確認提醒視窗
+│   ├── water_panel.py       # 喝水快選面板
+│   ├── animations.py        # 動畫引擎
+│   ├── particles.py         # 粒子系統
+│   └── effects.py           # 視覺效果（發光、陰影）
 ├── core/
-│   ├── scheduler.py       # 計時器管理
-│   └── water_tracker.py   # 喝水/用藥記錄與持久化
-└── data/                  # 自動建立
-    ├── settings.json      # 使用者設定
-    └── water_log.json     # 每日喝水與用藥記錄
+│   ├── scheduler.py         # 計時器管理
+│   ├── water_tracker.py     # 喝水/用藥記錄與持久化
+│   ├── system_monitor.py    # 系統硬體監控
+│   └── weather_service.py   # 天氣資料抓取
+└── data/                    # 自動建立
+    ├── settings.json        # 使用者設定
+    └── water_log.json       # 每日喝水與用藥記錄
 ```
 
 ---

@@ -20,6 +20,8 @@ except Exception:
 import config
 from core.scheduler import Scheduler
 from core.water_tracker import WaterTracker
+from core.system_monitor import SystemMonitor
+from core.weather_service import WeatherService
 from ui.clock_window import ClockWindow
 from ui.reminder_window import ReminderWindow
 
@@ -51,7 +53,7 @@ def save_settings(s: dict):
         pass
 
 
-# ── 設定對話框 ────────────────────────────────────────
+# ── 設定對話框（優化版）────────────────────────────────
 
 def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
     dlg = tk.Toplevel(root)
@@ -60,6 +62,19 @@ def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
     dlg.attributes("-topmost", True)
     dlg.resizable(False, False)
     dlg.grab_set()
+
+    # 標題區域
+    title_frame = tk.Frame(dlg, bg=config.BG_SECONDARY, height=40)
+    title_frame.pack(fill="x")
+    title_frame.pack_propagate(False)
+    
+    tk.Label(title_frame, text="⚙ 設定", 
+             font=config.FONT_REMIND,
+             fg=config.TEXT_PRIMARY, bg=config.BG_SECONDARY).pack(side="left", padx=16, pady=8)
+
+    # 內容區域
+    content_frame = tk.Frame(dlg, bg=config.BG_COLOR, padx=20, pady=16)
+    content_frame.pack(fill="both", expand=True)
 
     fields = [
         ("每日喝水目標 (ml)", "water_target_ml", int),
@@ -73,18 +88,48 @@ def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
     ]
 
     vars_ = {}
-    for label, key, _ in fields:
-        row = tk.Frame(dlg, bg=config.BG_COLOR)
-        row.pack(fill="x", padx=16, pady=4)
-        tk.Label(row, text=label, width=22, anchor="w",
-                 font=config.FONT_SMALL, fg=config.DATE_COLOR,
+    for i, (label, key, _) in enumerate(fields):
+        # 每個欄位一個容器
+        field_frame = tk.Frame(content_frame, bg=config.BG_COLOR)
+        field_frame.pack(fill="x", pady=4)
+        
+        # 標籤
+        tk.Label(field_frame, text=label, width=22, anchor="w",
+                 font=config.FONT_SMALL, fg=config.TEXT_SECONDARY,
                  bg=config.BG_COLOR).pack(side="left")
+        
+        # 輸入框（帶邊框效果）
+        input_frame = tk.Frame(field_frame, bg=config.BORDER_COLOR, padx=1, pady=1)
+        input_frame.pack(side="left", padx=(8, 0))
+        
         var = tk.StringVar(value=str(settings.get(key, "")))
         vars_[key] = var
-        tk.Entry(row, textvariable=var, width=8,
-                 bg=config.BTN_BG, fg=config.CLOCK_COLOR,
-                 insertbackground=config.CLOCK_COLOR,
-                 relief="flat").pack(side="left", padx=4)
+        
+        entry = tk.Entry(input_frame, textvariable=var, width=10,
+                         bg=config.BG_ELEVATED, fg=config.CLOCK_COLOR,
+                         insertbackground=config.CLOCK_COLOR,
+                         font=config.FONT_VALUE,
+                         relief="flat", bd=0)
+        entry.pack(padx=2, pady=2)
+        
+        # 輸入框focus效果
+        def on_focus_in(e, frame=input_frame, ent=entry):
+            frame.config(bg=config.BTN_PRIMARY)
+            ent.config(bg=config.BG_TERTIARY)
+        
+        def on_focus_out(e, frame=input_frame, ent=entry):
+            frame.config(bg=config.BORDER_COLOR)
+            ent.config(bg=config.BG_ELEVATED)
+        
+        entry.bind("<FocusIn>", on_focus_in)
+        entry.bind("<FocusOut>", on_focus_out)
+
+    # 分隔線
+    tk.Frame(content_frame, bg=config.DIVIDER_COLOR, height=1).pack(fill="x", pady=(12, 12))
+
+    # 按鈕區域
+    btn_frame = tk.Frame(content_frame, bg=config.BG_COLOR)
+    btn_frame.pack()
 
     def _save():
         for label, key, typ in fields:
@@ -95,18 +140,46 @@ def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
         on_save(settings)
         dlg.destroy()
 
-    btn_row = tk.Frame(dlg, bg=config.BG_COLOR)
-    btn_row.pack(pady=10)
-    tk.Button(btn_row, text="儲存", command=_save,
-              bg=config.WATER_COLOR, fg="white",
+    # 儲存按鈕
+    save_btn = tk.Button(btn_frame, text="儲存", command=_save,
+              bg=config.BTN_PRIMARY, fg="white",
+              font=config.FONT_BTN_LARGE, relief="flat",
+              padx=20, pady=8, cursor="hand2")
+    save_btn.pack(side="left", padx=8)
+    
+    # 儲存按鈕hover效果
+    def on_save_enter(e):
+        save_btn.config(bg=config.BTN_PRIMARY_HOVER)
+    def on_save_leave(e):
+        save_btn.config(bg=config.BTN_PRIMARY)
+    def on_save_press(e):
+        save_btn.config(bg=config.BTN_PRIMARY_ACTIVE)
+    def on_save_release(e):
+        save_btn.config(bg=config.BTN_PRIMARY_HOVER)
+    
+    save_btn.bind("<Enter>", on_save_enter)
+    save_btn.bind("<Leave>", on_save_leave)
+    save_btn.bind("<ButtonPress-1>", on_save_press)
+    save_btn.bind("<ButtonRelease-1>", on_save_release)
+
+    # 取消按鈕
+    cancel_btn = tk.Button(btn_frame, text="取消", command=dlg.destroy,
+              bg=config.BTN_BG, fg=config.TEXT_SECONDARY,
               font=config.FONT_BTN, relief="flat",
-              padx=14, pady=4, cursor="hand2").pack(side="left", padx=6)
-    tk.Button(btn_row, text="取消", command=dlg.destroy,
-              bg=config.BTN_BG, fg=config.DATE_COLOR,
-              font=config.FONT_BTN, relief="flat",
-              padx=14, pady=4, cursor="hand2").pack(side="left", padx=6)
+              padx=20, pady=8, cursor="hand2")
+    cancel_btn.pack(side="left", padx=8)
+    
+    # 取消按鈕hover效果
+    def on_cancel_enter(e):
+        cancel_btn.config(fg=config.TEXT_PRIMARY, bg=config.BG_TERTIARY)
+    def on_cancel_leave(e):
+        cancel_btn.config(fg=config.TEXT_SECONDARY, bg=config.BG_COLOR)
+    
+    cancel_btn.bind("<Enter>", on_cancel_enter)
+    cancel_btn.bind("<Leave>", on_cancel_leave)
 
     dlg.bind("<Escape>", lambda e: dlg.destroy())
+    
     # 置中
     dlg.update_idletasks()
     w, h = dlg.winfo_width(), dlg.winfo_height()
@@ -126,6 +199,8 @@ class App:
         self._scheduler = Scheduler(self._root)
         self._tracker = WaterTracker(self._settings["water_target_ml"])
         self._reminder = ReminderWindow(self._root)
+        self._sys_monitor = SystemMonitor()
+        self._weather_service = WeatherService()
 
         self._exercise_elapsed = 0   # 已坐秒數
         self._exercise_interval_s = self._settings["exercise_interval_minutes"] * 60
@@ -147,6 +222,8 @@ class App:
         self._sync_water_display()
         self._sync_med_display()
         self._start_tick()
+        self._start_sys_tick()
+        self._start_weather_tick()
         self._schedule_water_reminder()
         self._schedule_eow_reminder()
         self._schedule_med_reminder()
@@ -155,6 +232,30 @@ class App:
 
     def _start_tick(self):
         self._scheduler.schedule("tick", 1000, self._tick)
+
+    def _start_sys_tick(self):
+        self._scheduler.schedule("sys_tick", 2000, self._sys_tick)
+
+    def _start_weather_tick(self):
+        self._scheduler.schedule("weather_tick", 1000, self._refresh_weather)
+
+    def _refresh_weather(self):
+        def _apply(snapshot):
+            try:
+                self._root.after(0, lambda s=snapshot: self._clock.set_weather(s))
+            except Exception as ex:
+                print(f"[weather] UI update error: {ex}", file=sys.stderr)
+
+        try:
+            self._weather_service.refresh_async(_apply)
+        except Exception as ex:
+            print(f"[weather] refresh error: {ex}", file=sys.stderr)
+        self._scheduler.schedule("weather_tick", 2 * 60 * 60 * 1000, self._refresh_weather)
+
+    def _sys_tick(self):
+        self._sys_monitor.update()
+        self._clock.set_system_monitor(self._sys_monitor)
+        self._scheduler.schedule("sys_tick", 2000, self._sys_tick)
 
     def _tick(self):
         # 跨日檢查
@@ -314,6 +415,7 @@ class App:
         self._settings["window_y"] = y
         save_settings(self._settings)
         self._scheduler.cancel_all()
+        self._sys_monitor.shutdown()
         self._root.destroy()
 
     def _on_settings(self):

@@ -1,9 +1,9 @@
 # config.py — 全域顏色、字體、常數
 
 # 視窗尺寸
-WINDOW_WIDTH  = 380
-WINDOW_HEIGHT = 380
-WINDOW_BORDER = 1
+WINDOW_WIDTH  = 400
+WINDOW_HEIGHT = 420
+WINDOW_BORDER = 2
 
 # 設計系統 — 現代專業風格
 # ──────────────────────────────────────────────────────
@@ -13,6 +13,13 @@ BG_COLOR         = "#0f172a"   # 深藍黑（主背景）
 BG_SECONDARY     = "#1e293b"   # 次要背景
 BG_TERTIARY      = "#334155"   # 第三層背景
 BG_ELEVATED      = "#1a2332"   # 抬高背景（卡片效果）
+BG_GRADIENT_TOP  = "#0c1929"   # 漸變頂部
+BG_GRADIENT_BOT  = "#162032"   # 漸變底部
+
+# 脈衝邊框色系
+BORDER_PULSE_1   = "#3b82f6"   # 藍色脈衝
+BORDER_PULSE_2   = "#8b5cf6"   # 紫色脈衝
+BORDER_PULSE_3   = "#06b6d4"   # 青色脈衝
 
 # 邊框與分割線
 BORDER_COLOR     = "#475569"   # 中性灰藍邊框
@@ -107,6 +114,16 @@ GAUGE_SIZE       = 100        # 儀表盤大小
 INDICATOR_SIZE   = 60         # 小型指示器大小
 ICON_FONT_SIZE   = 32         # 動畫圖標字體大小
 
+# 指示器視覺增強
+ARC_WIDTH_MAIN   = 12         # 主弧線寬度
+ARC_WIDTH_GLOW   = 4          # 發光弧線寬度
+ARC_GLOW_LAYERS  = 3          # 發光層數
+INDICATOR_INNER_GLOW = True   # 內圈發光
+
+# 脈衝邊框
+PULSE_BORDER_SPEED   = 0.03   # 脈衝速度
+PULSE_BORDER_WIDTH   = 3      # 脈衝邊框寬度
+
 # AnimatedIcon 動畫參數
 SPARKLE_INTERVAL       = 6    # 粒子發射間隔（幀數）
 BORDER_WIDTH_BASE      = 3    # 圓形邊框基礎寬度
@@ -152,3 +169,10 @@ FONT_ICON       = ("Segoe UI", 12)
 FONT_ICON_LARGE = ("Segoe UI", 16)
 FONT_CIRCLE     = ("Segoe UI", 14, "bold")
 FONT_CIRCLE_SM  = ("Segoe UI", 10)
+FONT_SYS_CARD_TITLE = ("Segoe UI", 8, "bold")
+FONT_SYS_CARD_VALUE = ("Segoe UI", 10, "bold")
+FONT_SYS_CARD_SMALL = ("Segoe UI", 8)
+
+# 系統監控卡片
+SYS_CARD_BG      = "#172033"
+SYS_BAR_EMPTY    = "#243149"
