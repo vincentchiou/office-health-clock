@@ -1,8 +1,11 @@
 # core/water_tracker.py — 喝水記錄與持久化
 
 import json
+import logging
 import os
 from datetime import date, datetime
+
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 LOG_FILE = os.path.join(DATA_DIR, "water_log.json")
@@ -95,7 +98,8 @@ class WaterTracker:
         try:
             with open(LOG_FILE, "r", encoding="utf-8") as f:
                 self._log = json.load(f)
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as ex:
+            logger.warning("Failed to load water log, starting fresh: %s", ex)
             self._log = {}
 
     def _save(self):
@@ -106,5 +110,5 @@ class WaterTracker:
             with open(TMP_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._log, f, ensure_ascii=False, indent=2)
             os.replace(TMP_FILE, LOG_FILE)
-        except OSError:
-            pass
+        except OSError as ex:
+            logger.error("Failed to save water log: %s", ex)

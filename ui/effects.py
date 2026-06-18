@@ -2,8 +2,9 @@
 
 import tkinter as tk
 import math
-from typing import Tuple, Optional
+from typing import Tuple
 import config
+from ui.utils import hex_to_rgb, lerp_color
 
 
 class GlowEffect:
@@ -91,21 +92,7 @@ class GradientEffect:
             
     def _lerp_color(self, color1: str, color2: str, t: float) -> str:
         """Linear interpolation between two hex colors"""
-        # Convert hex to RGB
-        r1, g1, b1 = self._hex_to_rgb(color1)
-        r2, g2, b2 = self._hex_to_rgb(color2)
-        
-        # Interpolate
-        r = int(r1 + (r2 - r1) * t)
-        g = int(g1 + (g2 - g1) * t)
-        b = int(b1 + (b2 - b1) * t)
-        
-        return f"#{r:02x}{g:02x}{b:02x}"
-        
-    def _hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
-        """Convert hex color to RGB"""
-        hex_color = hex_color.lstrip('#')
-        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return lerp_color(color1, color2, t)
         
     def clear_gradient(self):
         """Clear all gradient effects"""

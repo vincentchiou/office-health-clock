@@ -2,11 +2,21 @@
 
 import ctypes
 import json
+import logging
 import os
 import random
 import sys
 import tkinter as tk
 from datetime import datetime, time as dtime
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stderr),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 # ── DPI 適配（必須在 tk.Tk() 之前）─────────────────────
 try:
@@ -40,17 +50,19 @@ def load_settings() -> dict:
             s = dict(config.DEFAULT_SETTINGS)
             s.update(loaded)
             return s
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as ex:
+            logger.warning("Failed to load settings, using defaults: %s", ex)
     return dict(config.DEFAULT_SETTINGS)
 
 
 def save_settings(s: dict):
+    tmp = SETTINGS_FILE + ".tmp"
     try:
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        with open(tmp, "w", encoding="utf-8") as f:
             json.dump(s, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
+        os.replace(tmp, SETTINGS_FILE)
+    except OSError as ex:
+        logger.error("Failed to save settings: %s", ex)
 
 
 # ── 設定對話框（優化版）────────────────────────────────

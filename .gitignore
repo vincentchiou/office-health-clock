@@ -15,6 +15,9 @@ data/settings.json
 # 日誌
 logs/
 
+# 測試快取
+.pytest_cache/
+
 # 系統檔案
 .DS_Store
 Thumbs.db

@@ -1,11 +1,15 @@
 # core/system_monitor.py — 系統硬體監控（CPU/GPU 溫度、VRAM/RAM 用量、CUDA 使用率）
 
+import glob
+import logging
 import os
 import platform
 import subprocess
 import sys
 import tempfile
 import time
+
+logger = logging.getLogger(__name__)
 
 
 class SystemMonitor:
@@ -53,7 +57,9 @@ class SystemMonitor:
             pynvml.nvmlInit()
             self._gpu = pynvml
             self._has_nvml = True
-        except Exception:
+            logger.info("NVIDIA NVML initialized")
+        except Exception as ex:
+            logger.debug("NVML not available: %s", ex)
             self._has_nvml = False
 
     def _init_lhm(self):
@@ -75,7 +81,9 @@ class SystemMonitor:
             computer.Open()
             self._lhm_computer = computer
             self._has_lhm = True
-        except Exception:
+            logger.info("LibreHardwareMonitor initialized")
+        except Exception as ex:
+            logger.debug("LHM not available: %s", ex)
             self._has_lhm = False
 
     def _find_lhm_dll(self) -> str:
@@ -90,7 +98,6 @@ class SystemMonitor:
             r"C:\Program Files\LibreHardwareMonitor",
             r"C:\Program Files (x86)\LibreHardwareMonitor",
         ]
-        import glob
         for pattern in candidates:
             for d in glob.glob(pattern):
                 dll = os.path.join(d, "LibreHardwareMonitorLib.dll")
@@ -118,8 +125,8 @@ class SystemMonitor:
                     if pid in result.stdout and self._has_valid_cpu_temp_file():
                         self._cpu_helper_started = True
                         return
-        except Exception:
-            pass
+        except Exception as ex:
+            logger.debug("CPU helper PID check failed: %s", ex)
         # 啟動 helper（以管理員權限）
         try:
             ps_cmd = f'Start-Process powershell -Verb RunAs -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \\"{self.CPU_TEMP_SCRIPT}\\""'
@@ -129,8 +136,9 @@ class SystemMonitor:
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
             self._cpu_helper_started = True
-        except Exception:
-            pass
+            logger.info("CPU temperature helper started")
+        except Exception as ex:
+            logger.warning("Failed to start CPU helper: %s", ex)
 
     def _has_valid_cpu_temp_file(self) -> bool:
         try:
@@ -327,4 +335,27 @@ class SystemMonitor:
             try:
                 self._lhm_computer.Close()
             except Exception:
+                pass
+        self._kill_cpu_helper()
+
+    def _kill_cpu_helper(self):
+        """Kill orphaned CPU helper process on shutdown."""
+        if not os.path.isfile(self.CPU_HELPER_PID_FILE):
+            return
+        try:
+            with open(self.CPU_HELPER_PID_FILE, "r", encoding="utf-8-sig") as f:
+                pid = f.read().strip()
+            if pid:
+                subprocess.run(
+                    ["taskkill", "/PID", pid, "/F"],
+                    capture_output=True, timeout=5,
+                    creationflags=subprocess.CREATE_NO_WINDOW,
+                )
+                logger.info("Killed CPU helper process PID %s", pid)
+        except Exception as ex:
+            logger.debug("Failed to kill CPU helper: %s", ex)
+        finally:
+            try:
+                os.remove(self.CPU_HELPER_PID_FILE)
+            except OSError:
                 pass

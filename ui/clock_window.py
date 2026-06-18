@@ -5,6 +5,7 @@ import math
 from datetime import datetime
 import config
 from ui.water_panel import WaterPanel
+from ui.utils import hex_to_rgb, brighten
 
 WEEKDAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 
@@ -103,12 +104,7 @@ class CircleIndicator:
 
     @staticmethod
     def _brighten(hex_color, amount):
-        h = hex_color.lstrip("#")
-        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-        r = min(255, int(r + (255 - r) * amount))
-        g = min(255, int(g + (255 - g) * amount))
-        b = min(255, int(b + (255 - b) * amount))
-        return f"#{r:02x}{g:02x}{b:02x}"
+        return brighten(hex_color, amount)
 
 
 class GaugeIndicator:
@@ -458,8 +454,7 @@ class ClockWindow:
 
     @staticmethod
     def _hex_to_rgb(hex_color):
-        h = hex_color.lstrip("#")
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        return hex_to_rgb(hex_color)
 
     def _build_titlebar(self):
         bar = tk.Frame(self._main, bg=config.BG_SECONDARY, height=32)

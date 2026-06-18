@@ -4,7 +4,7 @@ import tkinter as tk
 import math
 import random
 import time
-from typing import List, Tuple, Optional
+from typing import List
 from dataclasses import dataclass, field
 import config
 

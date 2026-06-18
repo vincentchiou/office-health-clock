@@ -5,13 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
-import math
+import logging
 import os
-import platform
-import subprocess
 import threading
 import urllib.parse
 import urllib.request
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -83,7 +83,8 @@ class WeatherService:
 
         try:
             return self._fetch_weather(location)
-        except Exception:
+        except Exception as ex:
+            logger.warning("Failed to fetch weather: %s", ex)
             return WeatherSnapshot(
                 location=str(location.get("name") or "--"),
                 icon="⛅",
@@ -97,15 +98,18 @@ class WeatherService:
     def _detect_location(self) -> dict[str, object] | None:
         location = self._detect_location_via_ip()
         if location:
-            self._location_cache = location
+            with self._lock:
+                self._location_cache = location
             return location
 
         location = self._detect_location_via_timezone()
         if location:
-            self._location_cache = location
+            with self._lock:
+                self._location_cache = location
             return location
 
-        return self._location_cache
+        with self._lock:
+            return self._location_cache
 
     def _detect_location_via_ip(self) -> dict[str, object] | None:
         urls = [
@@ -139,30 +143,17 @@ class WeatherService:
                     "lon": float(lon),
                     "timezone": timezone,
                 }
-            except Exception:
+            except Exception as ex:
+                logger.debug("IP location detection failed for %s: %s", url, ex)
                 continue
         return None
 
     def _detect_location_via_timezone(self) -> dict[str, object] | None:
         tz_name = None
-        if platform.system() == "Windows":
-            try:
-                result = subprocess.run(
-                    ["tzutil", "/g"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    creationflags=subprocess.CREATE_NO_WINDOW,
-                )
-                tz_name = result.stdout.strip() or None
-            except Exception:
-                tz_name = None
-
-        if not tz_name:
-            try:
-                tz_name = datetime.now().astimezone().tzname()
-            except Exception:
-                tz_name = None
+        try:
+            tz_name = datetime.now().astimezone().tzname()
+        except Exception:
+            tz_name = None
 
         if not tz_name:
             return None
