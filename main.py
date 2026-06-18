@@ -32,6 +32,7 @@ from core.scheduler import Scheduler
 from core.water_tracker import WaterTracker
 from core.system_monitor import SystemMonitor
 from core.weather_service import WeatherService
+from core.music_player import MusicPlayer
 from ui.clock_window import ClockWindow
 from ui.reminder_window import ReminderWindow
 
@@ -254,6 +255,7 @@ class App:
         self._reminder = ReminderWindow(self._root)
         self._sys_monitor = SystemMonitor()
         self._weather_service = WeatherService()
+        self._music_player = MusicPlayer()
         self._apply_weather_location()
 
         self._exercise_elapsed = 0   # 已坐秒數
@@ -265,12 +267,20 @@ class App:
 
         self._med_showing = False
 
+        # 設定音樂播放回呼
+        self._music_player.set_callbacks(
+            on_track_change=self._on_music_track_change,
+            on_error=self._on_music_error,
+        )
+
         self._clock = ClockWindow(
             self._root,
             self._settings,
             on_close=self._on_close,
             on_settings=self._on_settings,
             on_drink=self._record_water,
+            on_music_toggle=self._on_music_toggle,
+            on_music_next=self._on_music_next,
         )
 
         self._root.deiconify()
@@ -452,6 +462,33 @@ class App:
         self._tracker.add_water(ml)
         self._sync_water_display()
 
+    # ── 音樂播放 ────────────────────────────────────────
+
+    def _on_music_toggle(self):
+        """音樂播放/暫停切換"""
+        if self._music_player.is_playing():
+            self._music_player.pause()
+            self._clock.set_music_state(False)
+        else:
+            self._music_player.play()
+            self._clock.set_music_state(True)
+
+    def _on_music_next(self):
+        """下一首"""
+        self._music_player.next_track()
+
+    def _on_music_track_change(self, track):
+        """音樂曲目變更回呼"""
+        if track:
+            self._clock.set_music_state(True, track.title)
+        else:
+            self._clock.set_music_state(False)
+
+    def _on_music_error(self, msg: str):
+        """音樂播放錯誤回呼"""
+        logger.warning("Music error: %s", msg)
+        self._clock.set_music_state(False, "播放錯誤")
+
     # ── 工具 ──────────────────────────────────────────
 
     def _is_after_work(self) -> bool:
@@ -471,6 +508,7 @@ class App:
         save_settings(self._settings)
         self._scheduler.cancel_all()
         self._sys_monitor.shutdown()
+        self._music_player.shutdown()
         self._root.destroy()
 
     def _apply_weather_location(self):

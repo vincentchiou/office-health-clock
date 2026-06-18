@@ -1,2 +1,4 @@
 # Required runtime packages
 psutil>=5.9.0
+yt-dlp>=2024.1.0
+pygame>=2.5.0

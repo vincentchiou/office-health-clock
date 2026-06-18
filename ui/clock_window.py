@@ -298,12 +298,15 @@ class ClockWindow:
     - 圖標化系統監控
     """
 
-    def __init__(self, root: tk.Tk, settings: dict, on_close, on_settings, on_drink=None):
+    def __init__(self, root: tk.Tk, settings: dict, on_close, on_settings, on_drink=None,
+                 on_music_toggle=None, on_music_next=None):
         self._root = root
         self._settings = settings
         self._on_close = on_close
         self._on_settings = on_settings
         self._on_drink = on_drink
+        self._on_music_toggle = on_music_toggle
+        self._on_music_next = on_music_next
 
         self._exercise_remaining = settings.get("exercise_interval_minutes", 50) * 60
         self._exercise_interval = settings.get("exercise_interval_minutes", 50) * 60
@@ -331,6 +334,10 @@ class ClockWindow:
         self._weather_rain = None
         self._weather_description = "--"
         self._var_weather_main = tk.StringVar(value="⏳ 載入中...")
+
+        # 音樂播放狀態
+        self._music_playing = False
+        self._music_track_title = ""
 
         self._drag_x = 0
         self._drag_y = 0
@@ -389,6 +396,12 @@ class ClockWindow:
         self._weather_rain = getattr(snapshot, "rain_mm", None)
         self._weather_description = getattr(snapshot, "description", "--") or "--"
         self._update_weather_display()
+
+    def set_music_state(self, playing: bool, track_title: str = ""):
+        """更新音樂播放狀態"""
+        self._music_playing = playing
+        self._music_track_title = track_title
+        self._update_music_button()
 
     def get_position(self) -> tuple[int, int]:
         return self._root.winfo_x(), self._root.winfo_y()
@@ -542,7 +555,7 @@ class ClockWindow:
     def _build_info_area(self):
         # 資訊顯示區
         info_frame = tk.Frame(self._main, bg=config.BG_COLOR)
-        info_frame.pack(fill="x", padx=16, pady=(0, 8))
+        info_frame.pack(fill="x", padx=16, pady=(0, 4))
 
         # 水量文字
         self._var_water = tk.StringVar(value="0/2000ml")
@@ -564,6 +577,59 @@ class ClockWindow:
                                  font=config.FONT_VALUE,
                                  fg=config.COLOR_MED, bg=config.BG_COLOR)
         self._lbl_med.pack(side="right")
+
+        # ── 音樂播放按鈕區 ──
+        music_frame = tk.Frame(self._main, bg=config.BG_COLOR)
+        music_frame.pack(fill="x", padx=16, pady=(0, 4))
+
+        # 播放/暫停按鈕
+        self._var_music_btn = tk.StringVar(value="▶ 音樂")
+        self._btn_music = tk.Button(
+            music_frame,
+            textvariable=self._var_music_btn,
+            font=("Segoe UI", 9),
+            fg=config.TEXT_PRIMARY,
+            bg=config.BTN_BG,
+            activebackground=config.BTN_HOVER,
+            activeforeground=config.TEXT_PRIMARY,
+            relief="flat",
+            bd=0,
+            padx=8,
+            pady=2,
+            cursor="hand2",
+            command=self._on_music_btn_click,
+        )
+        self._btn_music.pack(side="left")
+
+        # 下一首按鈕
+        self._btn_music_next = tk.Button(
+            music_frame,
+            text="⏭",
+            font=("Segoe UI", 9),
+            fg=config.TEXT_SECONDARY,
+            bg=config.BTN_BG,
+            activebackground=config.BTN_HOVER,
+            activeforeground=config.TEXT_PRIMARY,
+            relief="flat",
+            bd=0,
+            padx=4,
+            pady=2,
+            cursor="hand2",
+            command=self._on_music_next_click,
+        )
+        self._btn_music_next.pack(side="left", padx=(4, 0))
+
+        # 歌曲標題
+        self._var_music_track = tk.StringVar(value="")
+        self._lbl_music_track = tk.Label(
+            music_frame,
+            textvariable=self._var_music_track,
+            font=("Segoe UI", 8),
+            fg=config.TEXT_TERTIARY,
+            bg=config.BG_COLOR,
+            anchor="w",
+        )
+        self._lbl_music_track.pack(side="left", padx=(8, 0), fill="x", expand=True)
 
     def _build_water_panel(self):
         if self._on_drink is not None:
@@ -658,6 +724,33 @@ class ClockWindow:
             self._var_med.set(f"用藥：{self._med_hour:02d}:{self._med_minute:02d}")
             self._lbl_med.config(fg=config.COLOR_MED)
             self._med_indicator.update(0.0, "未服", config.COLOR_MED)
+
+    # ── 音樂播放 ──────────────────────────────────────────
+
+    def _on_music_btn_click(self):
+        """音樂播放/暫停按鈕點擊"""
+        if self._on_music_toggle:
+            self._on_music_toggle()
+
+    def _on_music_next_click(self):
+        """下一首按鈕點擊"""
+        if self._on_music_next:
+            self._on_music_next()
+
+    def _update_music_button(self):
+        """更新音樂按鈕狀態"""
+        if self._music_playing:
+            self._var_music_btn.set("⏸ 暫停")
+            self._btn_music.config(fg=config.COLOR_TIMER)
+        else:
+            self._var_music_btn.set("▶ 音樂")
+            self._btn_music.config(fg=config.TEXT_PRIMARY)
+
+        # 顯示歌曲標題（截斷過長文字）
+        title = self._music_track_title
+        if len(title) > 20:
+            title = title[:18] + "..."
+        self._var_music_track.set(title)
 
     def _update_sys_display(self):
         # CPU 溫度
