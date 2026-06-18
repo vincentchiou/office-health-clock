@@ -856,7 +856,7 @@ class ClockWindow:
 
     # ── 拖曳與縮放 ──────────────────────────────────────
 
-    _EDGE = 6  # 邊緣感應寬度
+    _EDGE = 10  # 邊緣感應寬度
 
     def _setup_drag(self):
         self._main.bind("<ButtonPress-1>", self._start_drag)
@@ -983,15 +983,12 @@ class ClockWindow:
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
 
-        # 根據螢幕大小動態計算視窗尺寸（取螢幕短邊的 30%～40%）
-        short_side = min(sw, sh)
-        scale = 0.35
-        win_w = max(config.WINDOW_MIN_WIDTH, min(config.WINDOW_MAX_WIDTH, int(short_side * scale)))
-        win_h = max(config.WINDOW_MIN_HEIGHT, min(config.WINDOW_MAX_HEIGHT, int(win_w * 1.15)))
+        # 依實際內容需求自動調整尺寸，再固定停靠右下角
+        req_w = self._main.winfo_reqwidth() + (config.WINDOW_BORDER * 2)
+        req_h = self._main.winfo_reqheight() + (config.WINDOW_BORDER * 2)
+        win_w = max(config.WINDOW_MIN_WIDTH, min(config.WINDOW_MAX_WIDTH, req_w))
+        win_h = max(config.WINDOW_MIN_HEIGHT, min(config.WINDOW_MAX_HEIGHT, req_h))
 
-        x = self._settings.get("window_x", -1)
-        y = self._settings.get("window_y", -1)
-        if x < 0 or y < 0:
-            x = sw - win_w - 20
-            y = sh - win_h - 50
+        x = max(0, sw - win_w - 16)
+        y = max(0, sh - win_h - 48)
         self._root.geometry(f"{win_w}x{win_h}+{x}+{y}")

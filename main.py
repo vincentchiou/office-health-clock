@@ -472,7 +472,6 @@ class App:
             self._clock.set_music_state(False)
         else:
             threading.Thread(target=self._music_player.play, daemon=True).start()
-            self._clock.set_music_state(True)
 
     def _on_music_next(self):
         """下一首"""

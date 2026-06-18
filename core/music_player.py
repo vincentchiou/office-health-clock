@@ -9,6 +9,7 @@ import random
 import re
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from typing import Callable
 from urllib.request import urlopen, Request
@@ -41,6 +42,7 @@ class MusicPlayer:
         self._is_paused = False
         self._current_track: TrackInfo | None = None
         self._process: subprocess.Popen | None = None
+        self._track_started_at: float | None = None
         self._playlist: list[TrackInfo] = []
         self._playlist_index = 0
         self._shuffle = True
@@ -101,8 +103,9 @@ class MusicPlayer:
             return
 
         if not self._playlist:
-            self.load_playlist_async()
-            return
+            self._load_playlist()
+            if not self._playlist:
+                return
 
         self._play_current()
 
@@ -260,6 +263,7 @@ class MusicPlayer:
                 stderr=subprocess.DEVNULL,
                 creationflags=creationflags,
             )
+            self._track_started_at = time.monotonic()
             
             with self._lock:
                 self._is_playing = True
@@ -280,14 +284,31 @@ class MusicPlayer:
     def _watch_playback(self):
         """背景執行緒監聽播放狀態"""
         def _watch():
-            import time
             while self._is_playing and not self._is_paused:
                 proc = self._process
                 if proc is None:
                     return
                 if proc.poll() is not None:
-                    self._stop()
-                    self._next_and_play()
+                    elapsed = 0.0
+                    started_at = self._track_started_at
+                    if started_at is not None:
+                        elapsed = time.monotonic() - started_at
+
+                    current = self._current_track
+                    expected = float(getattr(current, "duration", 0) or 0)
+                    min_elapsed = max(20.0, expected * 0.85) if expected > 0 else 20.0
+
+                    if elapsed >= min_elapsed:
+                        self._stop()
+                        self._next_and_play()
+                    else:
+                        logger.warning(
+                            "Playback ended early after %.1fs (expected %.1fs): %s",
+                            elapsed,
+                            expected,
+                            current.title if current else "unknown",
+                        )
+                        self._stop()
                     return
                 time.sleep(1)
         
@@ -305,6 +326,7 @@ class MusicPlayer:
         self._is_playing = False
         self._is_paused = False
         self._current_track = None
+        self._track_started_at = None
         self._notify_track_change(None)
         logger.info("Stopped")
 
