@@ -2,7 +2,7 @@
 
 一款常駐於桌面角落的辦公室健康小幫手，幫助久坐上班族養成運動、喝水、按時服藥的好習慣。
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.0-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.1-brightgreen)
 
 ---
 
@@ -227,6 +227,17 @@ MIT License — 自由使用、修改、分享。
 ---
 
 ## 更新紀錄
+
+### v2.1 (2026-06-18)
+
+- **logging 改善**：所有模組改用 `logging`，不再靜默吞掉例外
+- **執行緒安全**：`WeatherService._detect_location` 加鎖保護共享狀態
+- **原子寫入**：設定檔改用 tmp+rename 模式，避免寫入中斷導致損壞
+- **共用工具模組**：建立 `ui/utils.py`，統一 `hex_to_rgb`、`brighten`、`lerp_color`
+- **清理孤兒進程**：關閉時自動 kill CPU helper 背景進程
+- **timezone 原生化**：移除 `tzutil` subprocess，改用 Python 原生 `datetime.now().astimezone()`
+- **清理未使用 import**：移除 `effects.py`、`particles.py` 中未使用的 typing
+- **單元測試**：建立 31 個測試（WaterTracker、Scheduler、WeatherService、utils）
 
 ### v2.0 (2026-06-10)
 
