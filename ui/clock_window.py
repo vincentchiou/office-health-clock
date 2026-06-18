@@ -740,7 +740,7 @@ class ClockWindow:
     def _update_music_button(self):
         """更新音樂按鈕狀態"""
         if self._music_playing:
-            self._var_music_btn.set("⏸ 暫停")
+            self._var_music_btn.set("⏹ 停止")
             self._btn_music.config(fg=config.COLOR_TIMER)
         else:
             self._var_music_btn.set("▶ 音樂")

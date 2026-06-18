@@ -6,6 +6,7 @@ import logging
 import os
 import random
 import sys
+import threading
 import tkinter as tk
 from datetime import datetime, time as dtime
 
@@ -470,12 +471,12 @@ class App:
             self._music_player.pause()
             self._clock.set_music_state(False)
         else:
-            self._music_player.play()
+            threading.Thread(target=self._music_player.play, daemon=True).start()
             self._clock.set_music_state(True)
 
     def _on_music_next(self):
         """下一首"""
-        self._music_player.next_track()
+        threading.Thread(target=self._music_player.next_track, daemon=True).start()
 
     def _on_music_track_change(self, track):
         """音樂曲目變更回呼"""
