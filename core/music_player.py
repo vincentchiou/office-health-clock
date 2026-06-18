@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import re
+import tempfile
 import subprocess
 import threading
 import time
@@ -43,6 +44,7 @@ class MusicPlayer:
         self._current_track: TrackInfo | None = None
         self._process: subprocess.Popen | None = None
         self._track_started_at: float | None = None
+        self._current_audio_path: str | None = None
         self._playlist: list[TrackInfo] = []
         self._playlist_index = 0
         self._shuffle = True
@@ -240,9 +242,25 @@ class MusicPlayer:
                 self._next_and_play()
                 return
 
-            # 直接用 ffplay 串流播放，避免完整下載造成長延遲
+            # 先下載成暫存檔，再用 ffplay 播放，避免串流中途失效
             self._stop_process()
             volume = max(0, min(100, int(self._volume * 100)))
+            temp_dir = tempfile.mkdtemp(prefix="mbplayer_")
+            outtmpl = os.path.join(temp_dir, "%(title).50s.%(ext)s")
+            ydl_opts = {
+                'quiet': True,
+                'no_warnings': True,
+                'format': f"{best.get('format_id')}" if best.get('format_id') else 'bestaudio/best',
+                'outtmpl': outtmpl,
+            }
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(youtube_url, download=True)
+
+            audio_path = ydl.prepare_filename(info) if info else None
+            if not audio_path or not os.path.exists(audio_path):
+                raise RuntimeError("下載音訊失敗")
+
+            self._current_audio_path = audio_path
             cmd = [
                 "ffplay",
                 "-nodisp",
@@ -251,7 +269,7 @@ class MusicPlayer:
                 "error",
                 "-volume",
                 str(volume),
-                audio_url,
+                audio_path,
             ]
             creationflags = 0
             if os.name == "nt":
@@ -327,6 +345,7 @@ class MusicPlayer:
         self._is_paused = False
         self._current_track = None
         self._track_started_at = None
+        self._cleanup_audio_file()
         self._notify_track_change(None)
         logger.info("Stopped")
 
@@ -362,5 +381,22 @@ class MusicPlayer:
                     proc.wait(timeout=5)
                 except Exception:
                     proc.kill()
+        except Exception:
+            pass
+
+    def _cleanup_audio_file(self):
+        path = self._current_audio_path
+        self._current_audio_path = None
+        if not path:
+            return
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+            parent = os.path.dirname(path)
+            if os.path.isdir(parent):
+                try:
+                    os.rmdir(parent)
+                except Exception:
+                    pass
         except Exception:
             pass
