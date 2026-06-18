@@ -1,8 +1,2 @@
-# ── 核心依賴 ──────────────────────────────────────────
-psutil>=5.9.0          # 系統 RAM 監控
-
-# ── NVIDIA GPU 監控（需安裝 NVIDIA 驅動）──────────────
-pynvml>=11.5.0         # GPU 溫度、VRAM、CUDA 使用率
-
-# ── CPU 溫度（可選後備）──────────────────────────────
-# pythonnet 移至 requirements-optional.txt，因為屬於可選後備方案
+# Required runtime packages
+psutil>=5.9.0

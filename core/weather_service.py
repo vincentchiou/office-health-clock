@@ -34,6 +34,13 @@ class WeatherService:
         self._snapshot: WeatherSnapshot | None = None
         self._last_refresh: datetime | None = None
         self._location_cache: dict[str, object] | None = None
+        self._manual_location: dict[str, object] | None = None
+
+    def set_manual_location(self, location: dict[str, object] | None) -> None:
+        with self._lock:
+            self._manual_location = location
+            self._snapshot = None
+            self._last_refresh = None
 
     def get_snapshot(self, force: bool = False) -> WeatherSnapshot:
         now = datetime.now()
@@ -57,7 +64,12 @@ class WeatherService:
         threading.Thread(target=worker, daemon=True).start()
 
     def _refresh(self) -> WeatherSnapshot:
-        location = self._detect_location()
+        with self._lock:
+            manual = self._manual_location
+        if manual:
+            location = manual
+        else:
+            location = self._detect_location()
         if location is None:
             return WeatherSnapshot(
                 location="--",
@@ -114,7 +126,7 @@ class WeatherService:
                 if lat is None or lon is None:
                     continue
 
-                city = payload.get("city") or payload.get("region") or "當地"
+                city = payload.get("region") or payload.get("city") or "當地"
                 name = str(city)
 
                 timezone = payload.get("timezone") or "auto"

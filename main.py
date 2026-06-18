@@ -124,6 +124,40 @@ def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
         entry.bind("<FocusIn>", on_focus_in)
         entry.bind("<FocusOut>", on_focus_out)
 
+    # ── 天氣地區下拉選單 ──
+    loc_frame = tk.Frame(content_frame, bg=config.BG_COLOR)
+    loc_frame.pack(fill="x", pady=4)
+
+    tk.Label(loc_frame, text="天氣地區", width=22, anchor="w",
+             font=config.FONT_SMALL, fg=config.TEXT_SECONDARY,
+             bg=config.BG_COLOR).pack(side="left")
+
+    loc_names = list(config.TAIWAN_LOCATIONS.keys())
+    current_loc = settings.get("weather_location", "auto")
+    # 找到目前設定對應的顯示名稱
+    current_label = "自動偵測"
+    for label, val in config.TAIWAN_LOCATIONS.items():
+        if isinstance(val, dict) and val.get("name") == current_loc:
+            current_label = label
+            break
+        elif val == current_loc:
+            current_label = label
+            break
+
+    loc_var = tk.StringVar(value=current_label)
+    vars_["weather_location_label"] = loc_var
+
+    loc_option = tk.OptionMenu(content_frame, loc_var, *loc_names)
+    loc_option.config(
+        font=config.FONT_SMALL,
+        bg=config.BG_ELEVATED, fg=config.CLOCK_COLOR,
+        activebackground=config.BG_TERTIARY,
+        activeforeground=config.CLOCK_COLOR,
+        highlightthickness=0, relief="flat", bd=0,
+        width=18,
+    )
+    loc_option.pack(fill="x", pady=(0, 4))
+
     # 分隔線
     tk.Frame(content_frame, bg=config.DIVIDER_COLOR, height=1).pack(fill="x", pady=(12, 12))
 
@@ -137,6 +171,13 @@ def show_settings_dialog(root: tk.Tk, settings: dict, on_save):
                 settings[key] = typ(vars_[key].get())
             except ValueError:
                 pass
+        # 處理天氣地區
+        selected_label = vars_["weather_location_label"].get()
+        loc_val = config.TAIWAN_LOCATIONS.get(selected_label, "auto")
+        if isinstance(loc_val, dict):
+            settings["weather_location"] = loc_val["name"]
+        else:
+            settings["weather_location"] = loc_val
         on_save(settings)
         dlg.destroy()
 
@@ -201,6 +242,7 @@ class App:
         self._reminder = ReminderWindow(self._root)
         self._sys_monitor = SystemMonitor()
         self._weather_service = WeatherService()
+        self._apply_weather_location()
 
         self._exercise_elapsed = 0   # 已坐秒數
         self._exercise_interval_s = self._settings["exercise_interval_minutes"] * 60
@@ -216,6 +258,7 @@ class App:
             self._settings,
             on_close=self._on_close,
             on_settings=self._on_settings,
+            on_drink=self._record_water,
         )
 
         self._root.deiconify()
@@ -234,10 +277,10 @@ class App:
         self._scheduler.schedule("tick", 1000, self._tick)
 
     def _start_sys_tick(self):
-        self._scheduler.schedule("sys_tick", 2000, self._sys_tick)
+        self._scheduler.schedule("sys_tick", 3000, self._sys_tick)
 
     def _start_weather_tick(self):
-        self._scheduler.schedule("weather_tick", 1000, self._refresh_weather)
+        self._scheduler.schedule("weather_tick", 100, self._refresh_weather)
 
     def _refresh_weather(self):
         def _apply(snapshot):
@@ -255,7 +298,7 @@ class App:
     def _sys_tick(self):
         self._sys_monitor.update()
         self._clock.set_system_monitor(self._sys_monitor)
-        self._scheduler.schedule("sys_tick", 2000, self._sys_tick)
+        self._scheduler.schedule("sys_tick", 3000, self._sys_tick)
 
     def _tick(self):
         # 跨日檢查
@@ -418,6 +461,17 @@ class App:
         self._sys_monitor.shutdown()
         self._root.destroy()
 
+    def _apply_weather_location(self):
+        loc = self._settings.get("weather_location", "auto")
+        if loc == "auto":
+            self._weather_service.set_manual_location(None)
+        else:
+            for label, val in config.TAIWAN_LOCATIONS.items():
+                if isinstance(val, dict) and val.get("name") == loc:
+                    self._weather_service.set_manual_location(val)
+                    return
+            self._weather_service.set_manual_location(None)
+
     def _on_settings(self):
         def _save(new_settings):
             self._settings.update(new_settings)
@@ -426,6 +480,9 @@ class App:
             self._tracker.set_target(new_settings["water_target_ml"])
             # 更新久坐間隔
             self._exercise_interval_s = new_settings["exercise_interval_minutes"] * 60
+            # 更新天氣地區
+            self._apply_weather_location()
+            self._refresh_weather()
             # 重排喝水提醒
             self._scheduler.cancel("water_remind")
             self._schedule_water_reminder()

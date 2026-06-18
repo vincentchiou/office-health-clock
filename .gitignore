@@ -12,6 +12,9 @@ data/water_log.json
 data/water_log.json.tmp
 data/settings.json
 
+# 日誌
+logs/
+
 # 系統檔案
 .DS_Store
 Thumbs.db

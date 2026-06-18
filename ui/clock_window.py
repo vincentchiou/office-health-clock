@@ -4,6 +4,7 @@ import tkinter as tk
 import math
 from datetime import datetime
 import config
+from ui.water_panel import WaterPanel
 
 WEEKDAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 
@@ -36,9 +37,9 @@ class CircleIndicator:
             self._draw()
             self.animation_id = None
             return
-        self.progress += diff * 0.12
+        self.progress += diff * 0.15
         self._draw()
-        self.animation_id = self.canvas.after(16, self._animate_progress)
+        self.animation_id = self.canvas.after(30, self._animate_progress)
         
     def _draw(self):
         self.canvas.delete("all")
@@ -141,9 +142,9 @@ class GaugeIndicator:
             self._draw()
             self.animation_id = None
             return
-        self.progress += diff * 0.12
+        self.progress += diff * 0.15
         self._draw()
-        self.animation_id = self.canvas.after(16, self._animate_gauge)
+        self.animation_id = self.canvas.after(30, self._animate_gauge)
         
     def _draw(self):
         self.canvas.delete("all")
@@ -301,11 +302,12 @@ class ClockWindow:
     - 圖標化系統監控
     """
 
-    def __init__(self, root: tk.Tk, settings: dict, on_close, on_settings):
+    def __init__(self, root: tk.Tk, settings: dict, on_close, on_settings, on_drink=None):
         self._root = root
         self._settings = settings
         self._on_close = on_close
         self._on_settings = on_settings
+        self._on_drink = on_drink
 
         self._exercise_remaining = settings.get("exercise_interval_minutes", 50) * 60
         self._exercise_interval = settings.get("exercise_interval_minutes", 50) * 60
@@ -417,6 +419,7 @@ class ClockWindow:
         self._build_titlebar()
         self._build_clock_area()
         self._build_info_area()
+        self._build_water_panel()
         self._build_sys_area()
         self._setup_drag()
         self._start_pulse_border()
@@ -451,7 +454,7 @@ class ClockWindow:
 
         color = f"#{r:02x}{g:02x}{b:02x}"
         self._border_frame.config(bg=color)
-        self._root.after(33, self._pulse_border)
+        self._root.after(80, self._pulse_border)
 
     @staticmethod
     def _hex_to_rgb(hex_color):
@@ -566,6 +569,11 @@ class ClockWindow:
                                  font=config.FONT_VALUE,
                                  fg=config.COLOR_MED, bg=config.BG_COLOR)
         self._lbl_med.pack(side="right")
+
+    def _build_water_panel(self):
+        if self._on_drink is not None:
+            panel = WaterPanel(self._main, on_drink=self._on_drink)
+            panel.pack(fill="x", padx=16, pady=(0, 8))
 
     def _build_sys_area(self):
         # 分隔線
@@ -883,19 +891,19 @@ class ClockWindow:
     # ── 位置 ──────────────────────────────────────────────
 
     def _place_window(self):
+        self._root.update_idletasks()
+        sw = self._root.winfo_screenwidth()
+        sh = self._root.winfo_screenheight()
+
+        # 根據螢幕大小動態計算視窗尺寸（取螢幕短邊的 30%～40%）
+        short_side = min(sw, sh)
+        scale = 0.35
+        win_w = max(config.WINDOW_MIN_WIDTH, min(config.WINDOW_MAX_WIDTH, int(short_side * scale)))
+        win_h = max(config.WINDOW_MIN_HEIGHT, min(config.WINDOW_MAX_HEIGHT, int(win_w * 1.15)))
+
         x = self._settings.get("window_x", -1)
         y = self._settings.get("window_y", -1)
-        # 先讓內容自動計算高度
-        self._root.update_idletasks()
-        req_h = self._root.winfo_reqheight()
-        req_w = self._root.winfo_reqwidth()
-        # 至少保持最小尺寸
-        win_w = max(config.WINDOW_WIDTH, req_w)
-        win_h = max(config.WINDOW_HEIGHT, req_h)
         if x < 0 or y < 0:
-            sw = self._root.winfo_screenwidth()
-            sh = self._root.winfo_screenheight()
             x = sw - win_w - 20
             y = sh - win_h - 50
-        self._root.geometry(
-            f"{win_w}x{win_h}+{x}+{y}")
+        self._root.geometry(f"{win_w}x{win_h}+{x}+{y}")

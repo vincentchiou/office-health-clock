@@ -1,2 +1,3 @@
-# ── CPU 溫度（可選後備）──────────────────────────────
-pythonnet>=3.0.0       # .NET interop，載入 LHM DLL（可選，後備方案）
+# Optional hardware monitoring packages
+pynvml>=11.5.0
+pythonnet>=3.0.0
