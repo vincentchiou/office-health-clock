@@ -571,21 +571,21 @@ class ClockWindow:
                                       fg=config.COLOR_TIMER, bg=config.BG_COLOR)
         self._lbl_exercise.pack(side="left", padx=(20, 0))
 
+        # 右側容器（用藥 + 音樂按鈕）
+        right_container = tk.Frame(info_frame, bg=config.BG_COLOR)
+        right_container.pack(side="right")
+
         # 用藥文字
         self._var_med = tk.StringVar(value="用藥：13:40")
-        self._lbl_med = tk.Label(info_frame, textvariable=self._var_med,
+        self._lbl_med = tk.Label(right_container, textvariable=self._var_med,
                                  font=config.FONT_VALUE,
                                  fg=config.COLOR_MED, bg=config.BG_COLOR)
-        self._lbl_med.pack(side="right")
-
-        # ── 音樂播放按鈕區 ──
-        music_frame = tk.Frame(self._main, bg=config.BG_COLOR)
-        music_frame.pack(fill="x", padx=16, pady=(0, 4))
+        self._lbl_med.pack(side="left")
 
         # 播放/暫停按鈕
-        self._var_music_btn = tk.StringVar(value="▶ 音樂")
+        self._var_music_btn = tk.StringVar(value=" ▶ ")
         self._btn_music = tk.Button(
-            music_frame,
+            right_container,
             textvariable=self._var_music_btn,
             font=("Segoe UI", 9),
             fg=config.TEXT_PRIMARY,
@@ -594,35 +594,35 @@ class ClockWindow:
             activeforeground=config.TEXT_PRIMARY,
             relief="flat",
             bd=0,
-            padx=8,
-            pady=2,
+            padx=4,
+            pady=1,
             cursor="hand2",
             command=self._on_music_btn_click,
         )
-        self._btn_music.pack(side="left")
+        self._btn_music.pack(side="left", padx=(6, 0))
 
         # 下一首按鈕
         self._btn_music_next = tk.Button(
-            music_frame,
+            right_container,
             text="⏭",
-            font=("Segoe UI", 9),
+            font=("Segoe UI", 8),
             fg=config.TEXT_SECONDARY,
             bg=config.BTN_BG,
             activebackground=config.BTN_HOVER,
             activeforeground=config.TEXT_PRIMARY,
             relief="flat",
             bd=0,
-            padx=4,
-            pady=2,
+            padx=2,
+            pady=1,
             cursor="hand2",
             command=self._on_music_next_click,
         )
-        self._btn_music_next.pack(side="left", padx=(4, 0))
+        self._btn_music_next.pack(side="left", padx=(2, 0))
 
         # 歌曲標題
         self._var_music_track = tk.StringVar(value="")
         self._lbl_music_track = tk.Label(
-            music_frame,
+            right_container,
             textvariable=self._var_music_track,
             font=("Segoe UI", 8),
             fg=config.TEXT_TERTIARY,
