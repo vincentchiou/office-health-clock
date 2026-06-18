@@ -2,7 +2,7 @@
 
 一款常駐於桌面角落的辦公室健康小幫手，幫助久坐上班族養成運動、喝水、按時服藥的好習慣。
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.1-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.2-brightgreen)
 
 ---
 
@@ -18,6 +18,7 @@
 | 即時天氣 | 自動偵測所在地，顯示溫度、風速、降雨（Open-Meteo API，無需 Key） |
 | 系統監控 | CPU/GPU 溫度、CPU 忙碌度、RAM/VRAM 用量、CUDA 使用率 |
 | 可調大小 | 視窗邊緣可拖曳調整大小 |
+| 音樂播放 | 內建 mbplayer 華語熱門排行播放，支援播放/下一首 |
 | 彈性設定 | 下班時間、喝水目標、提醒間隔、用藥時間、天氣地區均可調整 |
 | 開機自動啟動 | 登入後自動在背景啟動，無需手動開啟 |
 
@@ -59,7 +60,7 @@
 
 1. 下載或 Clone 此專案
 2. 雙擊 `start.bat` 或 `一鍵啟動.bat`（第一次執行會自動偵測 Python、建立虛擬環境、安裝依賴，並加入 Windows 開機啟動）
-3. 時鐘視窗出現於螢幕右下角，可拖曳到任意位置
+3. 時鐘視窗預設停靠在螢幕右下角，可拖曳到任意位置
 
 ```bash
 git clone https://github.com/vincentchiou/office-health-clock.git
@@ -68,6 +69,8 @@ start.bat
 ```
 
 > **自動布署**：啟動器會自動偵測 Python（py / python / winget），建立虛擬環境，安裝依賴。可選依賴安裝失敗時主程式仍可降級運作。
+
+> **音樂播放需求**：內建音樂播放使用 `mbplayer` 與 `ffplay`。請確保系統已安裝 FFmpeg（包含 `ffplay`）並可在 PATH 中使用。
 
 ---
 
@@ -227,6 +230,13 @@ MIT License — 自由使用、修改、分享。
 ---
 
 ## 更新紀錄
+
+### v2.2 (2026-06-18)
+
+- **音樂播放**：新增 mbplayer 華語熱門排行播放，支援播放 / 停止 / 下一首
+- **播放穩定性**：改用本機暫存音檔 + ffplay，避免串流中途失效
+- **UI 調整**：音樂控制移到用藥列右側，視窗預設停靠右下角，尺寸改為自動適配內容
+- **首次播放修正**：第一次按播放可直接開始，不需先按下一首
 
 ### v2.1 (2026-06-18)
 
