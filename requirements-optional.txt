@@ -1,3 +1,4 @@
 # Optional hardware monitoring packages
-pynvml>=11.5.0
+# Note: 使用 nvidia-ml-py 取代已棄用的 pynvml，避免套件衝突導致崩潰
+nvidia-ml-py>=11.5.0
 pythonnet>=3.0.0

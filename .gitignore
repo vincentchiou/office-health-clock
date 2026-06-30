@@ -26,3 +26,6 @@ Thumbs.db
 *.egg-info/
 dist/
 build/
+
+# Playwright 測試截圖
+.playwright-mcp/

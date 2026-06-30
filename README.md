@@ -2,7 +2,7 @@
 
 一款常駐於桌面角落的辦公室健康小幫手，幫助久坐上班族養成運動、喝水、按時服藥的好習慣。
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.2-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10+-blue) ![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey) ![License](https://img.shields.io/badge/License-MIT-green) ![Version](https://img.shields.io/badge/Version-2.3-brightgreen)
 
 ---
 
@@ -18,9 +18,10 @@
 | 即時天氣 | 自動偵測所在地，顯示溫度、風速、降雨（Open-Meteo API，無需 Key） |
 | 系統監控 | CPU/GPU 溫度、CPU 忙碌度、RAM/VRAM 用量、CUDA 使用率 |
 | 可調大小 | 視窗邊緣可拖曳調整大小 |
-| 音樂播放 | 內建 mbplayer 華語熱門排行播放，支援播放/下一首 |
+| 音樂播放 | 內建 mbplayer 華語熱門排行播放，支援播放/下一首，防重入設計 |
 | 彈性設定 | 下班時間、喝水目標、提醒間隔、用藥時間、天氣地區均可調整 |
 | 開機自動啟動 | 登入後自動在背景啟動，無需手動開啟 |
+| 一鍵部署 | 自動偵測 Python、建立虛擬環境、安裝所有依賴，全自動進度顯示 |
 
 ---
 
@@ -59,8 +60,9 @@
 ### 安裝與啟動
 
 1. 下載或 Clone 此專案
-2. 雙擊 `start.bat` 或 `一鍵啟動.bat`（第一次執行會自動偵測 Python、建立虛擬環境、安裝依賴，並加入 Windows 開機啟動）
-3. 時鐘視窗預設停靠在螢幕右下角，可拖曳到任意位置
+2. 雙擊 `start.bat` 或 `一鍵啟動.bat`
+3. 首次執行全自動：偵測 Python → 建立虛擬環境 → 安裝核心套件 → 安裝 GPU 監控 → 檢查 ffmpeg → 設定開機啟動
+4. 時鐘視窗預設停靠在螢幕右下角，可拖曳到任意位置
 
 ```bash
 git clone https://github.com/vincentchiou/office-health-clock.git
@@ -68,7 +70,7 @@ cd office-health-clock
 start.bat
 ```
 
-> **自動布署**：啟動器會自動偵測 Python（py / python / winget），建立虛擬環境，安裝依賴。可選依賴安裝失敗時主程式仍可降級運作。
+> **全自動部署**：啟動器會自動偵測 Python（優先 Python 3.12 → 3.11 → 3.10 → py launcher → 系統 python），若找不到則透過 `winget` 自動安裝。建立虛擬環境、安裝核心與可選依賴，全程顯示進度。
 
 > **音樂播放需求**：內建音樂播放使用 `mbplayer` 與 `ffplay`。請確保系統已安裝 FFmpeg（包含 `ffplay`）並可在 PATH 中使用。
 
@@ -123,15 +125,15 @@ start.bat
 
 ```
 office-health-clock/
-├── start.bat                # 一鍵啟動（自動偵測 Python）
+├── start.bat                # 一鍵啟動（自動偵測 Python、全自動安裝）
 ├── 一鍵啟動.bat             # 中文版啟動器
 ├── startup.vbs              # 無聲啟動器（供開機自動啟動）
 ├── ensure_startup_shortcut.ps1  # 自動建立啟動資料夾捷徑
 ├── cpu_temp_helper.ps1      # 背景 CPU 溫度讀取（管理員權限）
 ├── main.py                  # 主程式入口
 ├── config.py                # 顏色、字體、常數
-├── requirements.txt         # 核心依賴（psutil）
-├── requirements-optional.txt # 可選依賴（pynvml, pythonnet）
+├── requirements.txt         # 核心依賴（psutil, yt-dlp, pygame）
+├── requirements-optional.txt # 可選依賴（nvidia-ml-py, pythonnet）
 ├── ui/
 │   ├── clock_window.py      # 主時鐘視窗（含天氣、系統監控）
 │   ├── reminder_window.py   # 強制確認提醒視窗
@@ -143,7 +145,8 @@ office-health-clock/
 │   ├── scheduler.py         # 計時器管理
 │   ├── water_tracker.py     # 喝水/用藥記錄與持久化
 │   ├── system_monitor.py    # 系統硬體監控
-│   └── weather_service.py   # 天氣資料抓取
+│   ├── weather_service.py   # 天氣資料抓取
+│   └── music_player.py      # 音樂播放（mbplayer + yt-dlp + ffplay）
 └── data/                    # 自動建立
     ├── settings.json        # 使用者設定
     └── water_log.json       # 每日喝水與用藥記錄
@@ -230,6 +233,14 @@ MIT License — 自由使用、修改、分享。
 ---
 
 ## 更新紀錄
+
+### v2.3 (2026-06-30)
+
+- **一鍵部署**：`start.bat` 全面重寫，顯示 6 步驟進度（偵測 Python → venv → 核心套件 → GPU 監控 → ffmpeg → 開機啟動），全自動安裝
+- **音樂防重入**：新增 `_play_lock` 防止多個 ffplay 進程同時執行，重複點擊不再混亂
+- **拖曳優化**：快取螢幕尺寸與視窗大小，拖曳時不再每幀解析 geometry 字串，大幅減少卡頓
+- **視窗邊界保護**：儲存/讀取視窗位置時做邊界檢查，防止視窗跑到螢幕外
+- **依賴更新**：`requirements-optional.txt` 改用 `nvidia-ml-py`（取代已棄用的 `pynvml`），避免套件衝突導致崩潰
 
 ### v2.2 (2026-06-18)
 

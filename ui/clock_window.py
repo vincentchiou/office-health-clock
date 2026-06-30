@@ -931,9 +931,13 @@ class ClockWindow:
             self._resize_start_geo = self._root.geometry()
             return
 
-        # 拖曳模式
+        # 拖曳模式：快取螢幕與視窗尺寸，避免每幀解析 geometry
         self._drag_x = event.x_root - self._root.winfo_x()
         self._drag_y = event.y_root - self._root.winfo_y()
+        self._drag_win_w = w
+        self._drag_win_h = h
+        self._drag_sw = self._root.winfo_screenwidth()
+        self._drag_sh = self._root.winfo_screenheight()
 
     def _do_drag(self, event):
         if self._resize_edge:
@@ -964,13 +968,18 @@ class ClockWindow:
         else:
             x = event.x_root - self._drag_x
             y = event.y_root - self._drag_y
-            sw = self._root.winfo_screenwidth()
-            sh = self._root.winfo_screenheight()
-            geo = self._root.geometry()
-            parts = geo.replace("x", "+").split("+")
-            w, h = int(parts[0]), int(parts[1])
-            x = max(0, min(x, sw - w))
-            y = max(0, min(y, sh - h))
+            sw = self._drag_sw
+            sh = self._drag_sh
+            w = self._drag_win_w
+            h = self._drag_win_h
+            if x < 0:
+                x = 0
+            elif x > sw - w:
+                x = sw - w
+            if y < 0:
+                y = 0
+            elif y > sh - h:
+                y = sh - h
             self._root.geometry(f"+{x}+{y}")
 
     def _end_resize(self, event):
@@ -989,6 +998,20 @@ class ClockWindow:
         win_w = max(config.WINDOW_MIN_WIDTH, min(config.WINDOW_MAX_WIDTH, req_w))
         win_h = max(config.WINDOW_MIN_HEIGHT, min(config.WINDOW_MAX_HEIGHT, req_h))
 
-        x = max(0, sw - win_w - 16)
-        y = max(0, sh - win_h - 48)
+        # 從 settings 讀取上次位置，並做邊界檢查
+        x = self._settings.get("window_x", 0)
+        y = self._settings.get("window_y", 0)
+        # 確保視窗完全在螢幕內
+        if x < 0:
+            x = 0
+        elif x > sw - win_w:
+            x = max(0, sw - win_w)
+        if y < 0:
+            y = 0
+        elif y > sh - win_h:
+            y = max(0, sh - win_h)
+        # 如果 x/y 都是 0（預設），靠右下角
+        if x == 0 and y == 0:
+            x = max(0, sw - win_w - 16)
+            y = max(0, sh - win_h - 48)
         self._root.geometry(f"{win_w}x{win_h}+{x}+{y}")

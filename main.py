@@ -471,11 +471,13 @@ class App:
             self._music_player.pause()
             self._clock.set_music_state(False)
         else:
+            self._clock.set_music_state(True, "載入中...")
             threading.Thread(target=self._music_player.play, daemon=True).start()
 
     def _on_music_next(self):
         """下一首"""
-        threading.Thread(target=self._music_player.next_track, daemon=True).start()
+        if self._music_player.is_playing():
+            threading.Thread(target=self._music_player.next_track, daemon=True).start()
 
     def _on_music_track_change(self, track):
         """音樂曲目變更回呼"""
@@ -503,6 +505,11 @@ class App:
 
     def _on_close(self):
         x, y = self._clock.get_position()
+        # 邊界檢查：確保下次啟動時視窗在螢幕內
+        sw = self._root.winfo_screenwidth()
+        sh = self._root.winfo_screenheight()
+        x = max(0, min(x, sw - 100))
+        y = max(0, min(y, sh - 100))
         self._settings["window_x"] = x
         self._settings["window_y"] = y
         save_settings(self._settings)

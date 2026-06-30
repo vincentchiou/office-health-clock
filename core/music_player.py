@@ -52,6 +52,7 @@ class MusicPlayer:
         self._on_track_change: Callable[[TrackInfo | None], None] | None = None
         self._on_error: Callable[[str], None] | None = None
         self._lock = threading.Lock()
+        self._play_lock = threading.Lock()
         self._initialized = False
 
     def set_callbacks(self, on_track_change=None, on_error=None):
@@ -95,21 +96,27 @@ class MusicPlayer:
         threading.Thread(target=self._load_playlist, daemon=True).start()
 
     def play(self):
-        """播放/恢復播放"""
-        if not self._ensure_init():
-            self._notify_error("無法初始化音訊裝置")
+        """播放/恢復播放（防重入：同時只有一個播放緒）"""
+        if not self._play_lock.acquire(blocking=False):
+            logger.debug("play() ignored: already in progress")
             return
-
-        if self._is_paused:
-            self._resume()
-            return
-
-        if not self._playlist:
-            self._load_playlist()
-            if not self._playlist:
+        try:
+            if not self._ensure_init():
+                self._notify_error("無法初始化音訊裝置")
                 return
 
-        self._play_current()
+            if self._is_paused:
+                self._resume()
+                return
+
+            if not self._playlist:
+                self._load_playlist()
+                if not self._playlist:
+                    return
+
+            self._play_current()
+        finally:
+            self._play_lock.release()
 
     def pause(self):
         """暫停播放"""
