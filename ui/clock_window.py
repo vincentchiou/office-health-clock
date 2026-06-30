@@ -1,11 +1,14 @@
 # ui/clock_window.py — 主時鐘視窗（圖形化版）
 
+import logging
 import tkinter as tk
 import math
 from datetime import datetime
 import config
 from ui.water_panel import WaterPanel
 from ui.utils import hex_to_rgb, brighten
+
+logger = logging.getLogger(__name__)
 
 WEEKDAYS = ["週一", "週二", "週三", "週四", "週五", "週六", "週日"]
 
@@ -348,7 +351,8 @@ class ClockWindow:
 
         self._build()
         self._setup_particles()
-        self._place_window()
+        # 延遲定位：確保 mainloop 啟動後再設定視窗位置
+        self._root.after(50, self._place_window)
 
     # ── 公開 API ──────────────────────────────────────────
 
@@ -992,26 +996,27 @@ class ClockWindow:
         sw = self._root.winfo_screenwidth()
         sh = self._root.winfo_screenheight()
 
-        # 依實際內容需求自動調整尺寸，再固定停靠右下角
+        # 依實際內容需求自動調整尺寸
         req_w = self._main.winfo_reqwidth() + (config.WINDOW_BORDER * 2)
         req_h = self._main.winfo_reqheight() + (config.WINDOW_BORDER * 2)
         win_w = max(config.WINDOW_MIN_WIDTH, min(config.WINDOW_MAX_WIDTH, req_w))
         win_h = max(config.WINDOW_MIN_HEIGHT, min(config.WINDOW_MAX_HEIGHT, req_h))
 
-        # 從 settings 讀取上次位置，並做邊界檢查
+        # 從 settings 讀取上次位置
         x = self._settings.get("window_x", 0)
         y = self._settings.get("window_y", 0)
-        # 確保視窗完全在螢幕內
-        if x < 0:
-            x = 0
-        elif x > sw - win_w:
-            x = max(0, sw - win_w)
-        if y < 0:
-            y = 0
-        elif y > sh - win_h:
-            y = max(0, sh - win_h)
-        # 如果 x/y 都是 0（預設），靠右下角
-        if x == 0 and y == 0:
+
+        # 邊界檢查：確保視窗完全在螢幕內
+        valid = True
+        if x <= 0 or y <= 0:
+            valid = False
+        elif x + win_w > sw or y + win_h > sh:
+            valid = False
+
+        if not valid:
+            # 預設靠右下角
             x = max(0, sw - win_w - 16)
             y = max(0, sh - win_h - 48)
+
         self._root.geometry(f"{win_w}x{win_h}+{x}+{y}")
+        logger.info("Window placed at %dx%d+%d+%d (screen %dx%d)", win_w, win_h, x, y, sw, sh)

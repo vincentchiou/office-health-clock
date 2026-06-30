@@ -284,7 +284,8 @@ class App:
             on_music_next=self._on_music_next,
         )
 
-        self._root.deiconify()
+        # 延遲顯示：確保視窗定位完成後再 deiconify
+        self._root.after(100, self._show_window)
         self._sync_water_display()
         self._sync_med_display()
         self._start_tick()
@@ -555,6 +556,12 @@ class App:
         show_settings_dialog(self._root, self._settings, on_save=_save)
 
     # ── 啟動 ──────────────────────────────────────────
+
+    def _show_window(self):
+        """顯示視窗（確保定位完成後再顯示）"""
+        self._root.deiconify()
+        self._root.lift()
+        self._root.attributes("-topmost", True)
 
     def run(self):
         self._root.mainloop()
